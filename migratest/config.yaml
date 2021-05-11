@@ -1,0 +1,11 @@
+db:
+  host: "localhost"
+  port: 5432
+  db-name: "hydra"
+  credentials:
+    username: "postgres"
+    password: "pass"
+schema:
+  name: "public"
+migrations:
+  path: testdata/hydra-migrations
