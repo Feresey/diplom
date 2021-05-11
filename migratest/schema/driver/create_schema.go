@@ -12,10 +12,10 @@ import (
 
 // Tables returns the metadata for all tables, minus the tables
 // specified in the blacklist.
-func (p *PostgresDriver) Tables(ctx context.Context) ([]*schema.Table, error) {
+func (p *PostgresDriver) Tables(ctx context.Context, sc schema.SchemaSettings) ([]*schema.Table, error) {
 	var err error
 
-	names, err := p.TableNames(ctx)
+	names, err := p.TableNames(ctx, sc)
 	if err != nil {
 		return nil, fmt.Errorf("get table names: %w", err)
 	}
@@ -26,23 +26,23 @@ func (p *PostgresDriver) Tables(ctx context.Context) ([]*schema.Table, error) {
 	tables := make([]*schema.Table, 0, len(names))
 	for _, tableName := range names {
 		t := schema.Table{
-			SchemaName: p.sc.SchemaName,
+			SchemaName: sc.SchemaName,
 			Name:       tableName,
 		}
 
-		if t.Columns, err = p.Columns(ctx, tableName); err != nil {
+		if t.Columns, err = p.Columns(ctx, sc, tableName); err != nil {
 			return nil, err
 		}
 
-		if t.PKey, err = p.PrimaryKeyInfo(ctx, tableName); err != nil {
+		if t.PKey, err = p.PrimaryKeyInfo(ctx, sc, tableName); err != nil {
 			return nil, fmt.Errorf("get PK info for %s: %w", tableName, err)
 		}
 
-		if t.FKeys, err = p.ForeignKeyInfo(ctx, tableName); err != nil {
+		if t.FKeys, err = p.ForeignKeyInfo(ctx, sc, tableName); err != nil {
 			return nil, fmt.Errorf("get FK info for %s: %w", tableName, err)
 		}
 
-		p.filterForeignKeys(&t)
+		p.filterForeignKeys(&t, sc)
 
 		setIsJoinTable(&t)
 
@@ -61,11 +61,11 @@ func (p *PostgresDriver) Tables(ctx context.Context) ([]*schema.Table, error) {
 }
 
 // filterForeignKeys filter FK whose ForeignTable is not in whitelist or in blacklist.
-func (p *PostgresDriver) filterForeignKeys(t *schema.Table) {
+func (p *PostgresDriver) filterForeignKeys(t *schema.Table, sc schema.SchemaSettings) {
 	var fkeys []*schema.ForeignKey
 	for _, fkey := range t.FKeys {
-		if (len(p.sc.Whitelist) == 0 || strmangle.SetInclude(fkey.ForeignTable, p.sc.Whitelist)) &&
-			(len(p.sc.Blacklist) == 0 || !strmangle.SetInclude(fkey.ForeignTable, p.sc.Blacklist)) {
+		if (len(sc.Whitelist) == 0 || strmangle.SetInclude(fkey.ForeignTable, sc.Whitelist)) &&
+			(len(sc.Blacklist) == 0 || !strmangle.SetInclude(fkey.ForeignTable, sc.Blacklist)) {
 			fkeys = append(fkeys, fkey)
 		}
 	}

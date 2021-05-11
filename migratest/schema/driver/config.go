@@ -4,17 +4,13 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/Feresey/diplom/migratest/schema"
 )
 
 type UserInfo struct {
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
-}
-
-type SchemaConfig struct {
-	SchemaName string   `json:"schema_name,omitempty"`
-	Blacklist  []string `json:"blacklist,omitempty"`
-	Whitelist  []string `json:"whitelist,omitempty"`
 }
 
 type Config struct {
@@ -65,8 +61,14 @@ func NewDefaultConfig() *Config {
 	}
 }
 
-func NewDefaultSchemaConfig() *SchemaConfig {
-	return &SchemaConfig{
-		SchemaName: "public",
+func NewDefaultSchemaConfig() *schema.Config {
+	return &schema.Config{
+		Patterns: schema.SchemaPatterns{
+			Whitelist: []string{"public"},
+			Blacklist: []string{"pg_*", "information_schema"},
+		},
+		ConcreteConfig: []schema.SchemaSettings{
+			{SchemaName: "public"},
+		},
 	}
 }

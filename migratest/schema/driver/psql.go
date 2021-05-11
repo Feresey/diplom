@@ -24,17 +24,15 @@ import (
 // to the database connection.
 type PostgresDriver struct {
 	logger  *zap.Logger
-	sc      SchemaConfig
 	Conn    *pgx.Conn
 	version int
 }
 
 type In struct {
 	fx.In
-	LC           fx.Lifecycle
-	Logger       *zap.Logger
-	Config       Config
-	SchemaConfig SchemaConfig
+	LC     fx.Lifecycle
+	Logger *zap.Logger
+	Config Config
 }
 
 func NewPostgresDriver(in In) (*PostgresDriver, error) {
@@ -49,7 +47,6 @@ func NewPostgresDriver(in In) (*PostgresDriver, error) {
 
 	driver := &PostgresDriver{
 		logger: logger,
-		sc:     in.SchemaConfig,
 	}
 
 	in.LC.Append(fx.Hook{
@@ -69,13 +66,13 @@ func NewPostgresDriver(in In) (*PostgresDriver, error) {
 	return driver, nil
 }
 
-func (p *PostgresDriver) ParseSchema(ctx context.Context) (dbinfo []*schema.Table, err error) {
+func (p *PostgresDriver) ParseSchema(ctx context.Context, sc schema.SchemaSettings) (dbinfo []*schema.Table, err error) {
 	err = p.getVersion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get database version: %w", err)
 	}
 
-	tables, err := p.Tables(ctx)
+	tables, err := p.Tables(ctx, sc)
 	if err != nil {
 		return nil, fmt.Errorf("get schema info: %w", err)
 	}
@@ -118,8 +115,8 @@ func tablesFromList(list []string) []string {
 	return tables
 }
 
-func (p *PostgresDriver) filterTables(query string, args ...interface{}) (string, []interface{}) {
-	if wl := p.sc.Whitelist; len(wl) > 1 {
+func (p *PostgresDriver) filterTables(sc schema.SchemaSettings, query string, args ...interface{}) (string, []interface{}) {
+	if wl := sc.Whitelist; len(wl) > 1 {
 		tables := tablesFromList(wl)
 		if len(tables) > 0 {
 			query += fmt.Sprintf(" AND table_name IN (%s)", strmangle.Placeholders(true, len(tables), 2, 1))
@@ -127,7 +124,7 @@ func (p *PostgresDriver) filterTables(query string, args ...interface{}) (string
 				args = append(args, w)
 			}
 		}
-	} else if bl := p.sc.Blacklist; len(bl) > 0 {
+	} else if bl := sc.Blacklist; len(bl) > 0 {
 		tables := tablesFromList(bl)
 		if len(tables) > 0 {
 			query += fmt.Sprintf(" AND table_name NOT IN (%s)", strmangle.Placeholders(true, len(tables), 2, 1))
@@ -142,7 +139,7 @@ func (p *PostgresDriver) filterTables(query string, args ...interface{}) (string
 // TableNames connects to the postgres database and
 // retrieves all table names from the information_schema where the
 // table schema is schema. It uses a whitelist and blacklist.
-func (p *PostgresDriver) TableNames(ctx context.Context) ([]string, error) {
+func (p *PostgresDriver) TableNames(ctx context.Context, sc schema.SchemaSettings) ([]string, error) {
 	var names []string
 
 	query := `
@@ -154,10 +151,10 @@ WHERE
 	table_schema = $1
 	AND table_type = 'BASE TABLE'`
 
-	args := []interface{}{p.sc.SchemaName}
+	args := []interface{}{sc.SchemaName}
 
-	p.filterTables(query)
-	if wl := p.sc.Whitelist; len(wl) > 1 {
+	p.filterTables(sc, query)
+	if wl := sc.Whitelist; len(wl) > 1 {
 		tables := tablesFromList(wl)
 		if len(tables) > 0 {
 			query += fmt.Sprintf(" AND table_name IN (%s)", strmangle.Placeholders(true, len(tables), 2, 1))
@@ -165,7 +162,7 @@ WHERE
 				args = append(args, w)
 			}
 		}
-	} else if bl := p.sc.Blacklist; len(bl) > 0 {
+	} else if bl := sc.Blacklist; len(bl) > 0 {
 		tables := tablesFromList(bl)
 		if len(tables) > 0 {
 			query += fmt.Sprintf(" AND table_name NOT IN (%s)", strmangle.Placeholders(true, len(tables), 2, 1))
@@ -201,8 +198,8 @@ var allColumnsQuery string
 // from the database information_schema.columns. It retrieves the column names
 // and column types and returns those aS a []Column after TranslateColumnType()
 // converts the SQL types to Go types, for example: "varchar" to "string"
-func (p *PostgresDriver) Columns(ctx context.Context, tableName string) (res []*schema.Column, err error) {
-	rows, err := p.Conn.Query(ctx, allColumnsQuery, p.sc.SchemaName, tableName)
+func (p *PostgresDriver) Columns(ctx context.Context, sc schema.SchemaSettings, tableName string) (res []*schema.Column, err error) {
+	rows, err := p.Conn.Query(ctx, allColumnsQuery, sc.SchemaName, tableName)
 	if err != nil {
 		return nil, fmt.Errorf("create all columns query: %w", err)
 	}
@@ -237,7 +234,7 @@ func (p *PostgresDriver) Columns(ctx context.Context, tableName string) (res []*
 }
 
 // PrimaryKeyInfo looks up the primary key for a table.
-func (p *PostgresDriver) PrimaryKeyInfo(ctx context.Context, tableName string) (*schema.PrimaryKey, error) {
+func (p *PostgresDriver) PrimaryKeyInfo(ctx context.Context, sc schema.SchemaSettings, tableName string) (*schema.PrimaryKey, error) {
 	pkey := &schema.PrimaryKey{}
 	var err error
 
@@ -251,7 +248,7 @@ WHERE
 	AND tc.constraint_type = 'PRIMARY KEY'
 	AND tc.table_schema = $2`
 
-	row := p.Conn.QueryRow(ctx, pkNameQuery, tableName, p.sc.SchemaName)
+	row := p.Conn.QueryRow(ctx, pkNameQuery, tableName, sc.SchemaName)
 	if err = row.Scan(&pkey.Name); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -271,7 +268,7 @@ WHERE
 ORDER BY
 	k.ordinal_position`
 
-	rows, err := p.Conn.Query(ctx, pkColumnsQuery, pkey.Name, tableName, p.sc.SchemaName)
+	rows, err := p.Conn.Query(ctx, pkColumnsQuery, pkey.Name, tableName, sc.SchemaName)
 	if err != nil {
 		return nil, fmt.Errorf("create pk columns name query: %w", err)
 	}
@@ -299,7 +296,7 @@ ORDER BY
 }
 
 // ForeignKeyInfo retrieves the foreign keys for a given table name.
-func (p *PostgresDriver) ForeignKeyInfo(ctx context.Context, tableName string) (fkeys []*schema.ForeignKey, err error) {
+func (p *PostgresDriver) ForeignKeyInfo(ctx context.Context, sc schema.SchemaSettings, tableName string) (fkeys []*schema.ForeignKey, err error) {
 	whereConditions := []string{"pgn.nspname = $2", "pgc.relname = $1", "pgcon.contype = 'f'"}
 	if p.version >= 120000 {
 		whereConditions = append(whereConditions, "pgasrc.attgenerated = ''", "pgadst.attgenerated = ''")
@@ -323,7 +320,7 @@ func (p *PostgresDriver) ForeignKeyInfo(ctx context.Context, tableName string) (
 		strings.Join(whereConditions, " and "),
 	)
 
-	rows, err := p.Conn.Query(ctx, query, tableName, p.sc.SchemaName)
+	rows, err := p.Conn.Query(ctx, query, tableName, sc.SchemaName)
 	if err != nil {
 		return nil, fmt.Errorf("create FK query: %w", err)
 	}

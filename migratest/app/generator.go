@@ -2,6 +2,11 @@ package app
 
 import "github.com/Feresey/diplom/migratest/schema"
 
+type GeneratorConfig struct {
+	ColumnsDataset map[string]map[string]string
+	ExtraData      map[string]string
+}
+
 // map[column_name]column_value
 type TableRecord map[string]string
 

@@ -77,8 +77,8 @@ func (app *App) run(ctx context.Context) error {
 		// _ = app.m.Down()
 		// goto up
 	}
-
-	info, err := app.driver.ParseSchema(ctx)
+	// TODO multiple schemas
+	info, err := app.driver.ParseSchema(ctx, app.c.Schema.ConcreteConfig[0])
 	if err != nil {
 		return fmt.Errorf("parse schema: %w", err)
 	}
