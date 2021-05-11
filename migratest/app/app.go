@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/Feresey/diplom/migratest/schema/driver"
+	"github.com/golang-migrate/migrate/v4"
 )
 
 type App struct {
@@ -69,7 +71,11 @@ func (app *App) Run() error {
 func (app *App) run(ctx context.Context) error {
 	// TODO one by one
 	if err := app.m.Up(); err != nil {
-		return fmt.Errorf("apply migrations: %w", err)
+		if !errors.Is(err, migrate.ErrNoChange) {
+			return fmt.Errorf("apply migrations: %w", err)
+		}
+		// _ = app.m.Down()
+		// goto up
 	}
 
 	info, err := app.driver.ParseSchema(ctx)
@@ -83,10 +89,11 @@ func (app *App) run(ctx context.Context) error {
 	}
 	defer file.Close()
 
+	grapth := BuildGrapth(info)
 	enc := json.NewEncoder(file)
 	enc.SetIndent("", "\t")
 
-	if err := enc.Encode(info); err != nil {
+	if err := enc.Encode(grapth); err != nil {
 		return fmt.Errorf("show schema: %w", err)
 	}
 

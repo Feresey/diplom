@@ -40,11 +40,14 @@ func TestColumnDBTypes(t *testing.T) {
 func TestFilterColumnsByDefault(t *testing.T) {
 	t.Parallel()
 
+	things1 := "things1"
+	things2 := "things2"
+
 	cols := []Column{
-		{Name: "col1", Default: ""},
-		{Name: "col2", Default: "things"},
-		{Name: "col3", Default: ""},
-		{Name: "col4", Default: "things2"},
+		{Name: "col1", Default: nil},
+		{Name: "col2", Default: &things1},
+		{Name: "col3", Default: nil},
+		{Name: "col4", Default: &things2},
 	}
 
 	res := FilterColumnsByDefault(false, cols)

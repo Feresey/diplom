@@ -50,7 +50,7 @@ type ToManyRelationship struct {
 
 // ToOneRelationships relationship lookups
 // Input should be the sql name of a table like: videos
-func ToOneRelationships(table string, tables []Table) []ToOneRelationship {
+func ToOneRelationships(table string, tables []*Table) []*ToOneRelationship {
 	localTable := GetTable(tables, table)
 
 	return toOneRelationships(localTable, tables)
@@ -58,42 +58,43 @@ func ToOneRelationships(table string, tables []Table) []ToOneRelationship {
 
 // ToManyRelationships relationship lookups
 // Input should be the sql name of a table like: videos
-func ToManyRelationships(table string, tables []Table) []ToManyRelationship {
+func ToManyRelationships(table string, tables []*Table) (res []*ToManyRelationship) {
 	localTable := GetTable(tables, table)
 
 	return toManyRelationships(localTable, tables)
 }
 
-func toOneRelationships(table Table, tables []Table) []ToOneRelationship {
-	var relationships []ToOneRelationship
-
+func toOneRelationships(table *Table, tables []*Table) (res []*ToOneRelationship) {
 	for _, t := range tables {
 		for _, f := range t.FKeys {
 			if f.ForeignTable == table.Name && !t.IsJoinTable && f.Unique {
-				relationships = append(relationships, buildToOneRelationship(table, f, t, tables))
+				res = append(res, buildToOneRelationship(table, f, t, tables))
 			}
 		}
 	}
 
-	return relationships
+	return res
 }
 
-func toManyRelationships(table Table, tables []Table) []ToManyRelationship {
-	var relationships []ToManyRelationship
-
+func toManyRelationships(table *Table, tables []*Table) (res []*ToManyRelationship) {
 	for _, t := range tables {
 		for _, f := range t.FKeys {
 			if f.ForeignTable == table.Name && (t.IsJoinTable || !f.Unique) {
-				relationships = append(relationships, buildToManyRelationship(table, f, t, tables))
+				res = append(res, buildToManyRelationship(table, f, t, tables))
 			}
 		}
 	}
 
-	return relationships
+	return res
 }
 
-func buildToOneRelationship(localTable Table, foreignKey ForeignKey, foreignTable Table, tables []Table) ToOneRelationship {
-	return ToOneRelationship{
+func buildToOneRelationship(
+	localTable *Table,
+	foreignKey *ForeignKey,
+	foreignTable *Table,
+	tables []*Table,
+) *ToOneRelationship {
+	return &ToOneRelationship{
 		Name:     foreignKey.Name,
 		Table:    localTable.Name,
 		Column:   foreignKey.ForeignColumn,
@@ -107,9 +108,14 @@ func buildToOneRelationship(localTable Table, foreignKey ForeignKey, foreignTabl
 	}
 }
 
-func buildToManyRelationship(localTable Table, foreignKey ForeignKey, foreignTable Table, tables []Table) ToManyRelationship {
+func buildToManyRelationship(
+	localTable *Table,
+	foreignKey *ForeignKey,
+	foreignTable *Table,
+	tables []*Table,
+) *ToManyRelationship {
 	if !foreignTable.IsJoinTable {
-		return ToManyRelationship{
+		return &ToManyRelationship{
 			Name:                  foreignKey.Name,
 			Table:                 localTable.Name,
 			Column:                foreignKey.ForeignColumn,
@@ -154,5 +160,5 @@ func buildToManyRelationship(localTable Table, foreignKey ForeignKey, foreignTab
 		relationship.ForeignColumnUnique = fk.ForeignColumnUnique
 	}
 
-	return relationship
+	return &relationship
 }

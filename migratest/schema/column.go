@@ -9,13 +9,13 @@ import (
 // Column holds information about a database column.
 // Types are Go types, converted by TranslateColumnType.
 type Column struct {
-	Name      string `json:"name" toml:"name"`
-	DBType    string `json:"db_type" toml:"db_type"`
-	Default   string `json:"default" toml:"default"`
-	Comment   string `json:"comment" toml:"comment"`
-	Nullable  bool   `json:"nullable" toml:"nullable"`
-	Unique    bool   `json:"unique" toml:"unique"`
-	Validated bool   `json:"validated" toml:"validated"`
+	Name      string  `json:"name" toml:"name"`
+	DBType    string  `json:"db_type" toml:"db_type"`
+	Default   *string `json:"default" toml:"default"`
+	Comment   string  `json:"comment" toml:"comment"`
+	Nullable  bool    `json:"nullable" toml:"nullable"`
+	Unique    bool    `json:"unique" toml:"unique"`
+	Validated bool    `json:"validated" toml:"validated"`
 
 	// Postgres only extension bits
 	// ArrType is the underlying data type of the Postgres
@@ -78,7 +78,7 @@ func FilterColumnsByDefault(defaults bool, columns []Column) []Column {
 	var cols []Column
 
 	for _, c := range columns {
-		if (defaults && len(c.Default) != 0) || (!defaults && len(c.Default) == 0) {
+		if (defaults && c.Default != nil) || (!defaults && c.Default == nil) {
 			cols = append(cols, c)
 		}
 	}

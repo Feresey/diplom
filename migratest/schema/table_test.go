@@ -9,7 +9,7 @@ import (
 func TestGetTable(t *testing.T) {
 	t.Parallel()
 
-	tables := []Table{
+	tables := []*Table{
 		{Name: "one"},
 	}
 
@@ -20,7 +20,7 @@ func TestGetTable(t *testing.T) {
 func TestGetTableMissing(t *testing.T) {
 	t.Parallel()
 
-	tables := []Table{
+	tables := []*Table{
 		{Name: "one"},
 	}
 
@@ -31,7 +31,7 @@ func TestGetColumn(t *testing.T) {
 	t.Parallel()
 
 	table := Table{
-		Columns: []Column{
+		Columns: []*Column{
 			{Name: "one"},
 		},
 	}
@@ -44,7 +44,7 @@ func TestGetColumnMissing(t *testing.T) {
 	t.Parallel()
 
 	table := Table{
-		Columns: []Column{
+		Columns: []*Column{
 			{Name: "one"},
 		},
 	}

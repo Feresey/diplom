@@ -69,7 +69,7 @@ func NewPostgresDriver(in In) (*PostgresDriver, error) {
 	return driver, nil
 }
 
-func (p *PostgresDriver) ParseSchema(ctx context.Context) (dbinfo []schema.Table, err error) {
+func (p *PostgresDriver) ParseSchema(ctx context.Context) (dbinfo []*schema.Table, err error) {
 	err = p.getVersion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get database version: %w", err)
@@ -201,9 +201,7 @@ var allColumnsQuery string
 // from the database information_schema.columns. It retrieves the column names
 // and column types and returns those aS a []Column after TranslateColumnType()
 // converts the SQL types to Go types, for example: "varchar" to "string"
-func (p *PostgresDriver) Columns(ctx context.Context, tableName string) ([]schema.Column, error) {
-	var columns []schema.Column
-
+func (p *PostgresDriver) Columns(ctx context.Context, tableName string) (res []*schema.Column, err error) {
 	rows, err := p.Conn.Query(ctx, allColumnsQuery, p.sc.SchemaName, tableName)
 	if err != nil {
 		return nil, fmt.Errorf("create all columns query: %w", err)
@@ -212,34 +210,30 @@ func (p *PostgresDriver) Columns(ctx context.Context, tableName string) ([]schem
 
 	for rows.Next() {
 		var (
-			column       schema.Column
-			defaultValue *string
-			identity     bool
+			column   schema.Column
+			identity bool
 		)
 		if err := rows.Scan(
 			&column.Name, &column.DBType, &column.FullDBType,
 			&column.UDTName, &column.ArrType,
-			&column.DomainName, &defaultValue,
+			&column.DomainName, &column.Default,
 			&column.Comment, &column.Nullable,
 			&identity, &column.Unique,
 		); err != nil {
 			return nil, fmt.Errorf("scan columns for table %s: %w", tableName, err)
 		}
-
-		if defaultValue != nil {
-			column.Default = *defaultValue
-		}
 		if identity {
-			column.Default = "IDENTITY"
+			column.Default = new(string)
+			*column.Default = "IDENTITY"
 		}
 
-		columns = append(columns, column)
+		res = append(res, &column)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("scan rows: %w", err)
 	}
 
-	return columns, nil
+	return res, nil
 }
 
 // PrimaryKeyInfo looks up the primary key for a table.
@@ -305,9 +299,7 @@ ORDER BY
 }
 
 // ForeignKeyInfo retrieves the foreign keys for a given table name.
-func (p *PostgresDriver) ForeignKeyInfo(ctx context.Context, tableName string) ([]schema.ForeignKey, error) {
-	var fkeys []schema.ForeignKey
-
+func (p *PostgresDriver) ForeignKeyInfo(ctx context.Context, tableName string) (fkeys []*schema.ForeignKey, err error) {
 	whereConditions := []string{"pgn.nspname = $2", "pgc.relname = $1", "pgcon.contype = 'f'"}
 	if p.version >= 120000 {
 		whereConditions = append(whereConditions, "pgasrc.attgenerated = ''", "pgadst.attgenerated = ''")
@@ -346,7 +338,7 @@ func (p *PostgresDriver) ForeignKeyInfo(ctx context.Context, tableName string) (
 			return nil, fmt.Errorf("scan line: %w", err)
 		}
 
-		fkeys = append(fkeys, fkey)
+		fkeys = append(fkeys, &fkey)
 	}
 
 	if err = rows.Err(); err != nil {

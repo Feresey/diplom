@@ -12,7 +12,7 @@ import (
 
 // Tables returns the metadata for all tables, minus the tables
 // specified in the blacklist.
-func (p *PostgresDriver) Tables(ctx context.Context) ([]schema.Table, error) {
+func (p *PostgresDriver) Tables(ctx context.Context) ([]*schema.Table, error) {
 	var err error
 
 	names, err := p.TableNames(ctx)
@@ -23,7 +23,7 @@ func (p *PostgresDriver) Tables(ctx context.Context) ([]schema.Table, error) {
 	sort.Strings(names)
 	p.logger.Info("", zap.Strings("tables", names))
 
-	tables := make([]schema.Table, 0, len(names))
+	tables := make([]*schema.Table, 0, len(names))
 	for _, tableName := range names {
 		t := schema.Table{
 			SchemaName: p.sc.SchemaName,
@@ -46,17 +46,15 @@ func (p *PostgresDriver) Tables(ctx context.Context) ([]schema.Table, error) {
 
 		setIsJoinTable(&t)
 
-		tables = append(tables, t)
+		tables = append(tables, &t)
 	}
 
 	// Relationships have a dependency on foreign key nullability.
 	for i := range tables {
-		tbl := &tables[i]
-		setForeignKeyConstraints(tbl, tables)
+		setForeignKeyConstraints(tables[i], tables)
 	}
 	for i := range tables {
-		tbl := &tables[i]
-		setRelationships(tbl, tables)
+		setRelationships(tables[i], tables)
 	}
 
 	return tables, nil
@@ -64,7 +62,7 @@ func (p *PostgresDriver) Tables(ctx context.Context) ([]schema.Table, error) {
 
 // filterForeignKeys filter FK whose ForeignTable is not in whitelist or in blacklist.
 func (p *PostgresDriver) filterForeignKeys(t *schema.Table) {
-	var fkeys []schema.ForeignKey
+	var fkeys []*schema.ForeignKey
 	for _, fkey := range t.FKeys {
 		if (len(p.sc.Whitelist) == 0 || strmangle.SetInclude(fkey.ForeignTable, p.sc.Whitelist)) &&
 			(len(p.sc.Blacklist) == 0 || !strmangle.SetInclude(fkey.ForeignTable, p.sc.Blacklist)) {
@@ -98,7 +96,7 @@ func setIsJoinTable(t *schema.Table) {
 	t.IsJoinTable = true
 }
 
-func setForeignKeyConstraints(t *schema.Table, tables []schema.Table) {
+func setForeignKeyConstraints(t *schema.Table, tables []*schema.Table) {
 	for i, fkey := range t.FKeys {
 		localColumn := t.GetColumn(fkey.Column)
 		foreignTable := schema.GetTable(tables, fkey.ForeignTable)
@@ -111,14 +109,14 @@ func setForeignKeyConstraints(t *schema.Table, tables []schema.Table) {
 	}
 }
 
-func setRelationships(t *schema.Table, tables []schema.Table) {
-	t.ToOneRelationships = toOneRelationships(*t, tables)
-	t.ToManyRelationships = toManyRelationships(*t, tables)
+func setRelationships(t *schema.Table, tables []*schema.Table) {
+	t.ToOneRelationships = toOneRelationships(t, tables)
+	t.ToManyRelationships = toManyRelationships(t, tables)
 }
 
 // ToOneRelationships relationship lookups
 // Input should be the sql name of a table like: videos
-func ToOneRelationships(table string, tables []schema.Table) []schema.ToOneRelationship {
+func ToOneRelationships(table string, tables []*schema.Table) []*schema.ToOneRelationship {
 	localTable := schema.GetTable(tables, table)
 
 	return toOneRelationships(localTable, tables)
@@ -126,47 +124,42 @@ func ToOneRelationships(table string, tables []schema.Table) []schema.ToOneRelat
 
 // ToManyRelationships relationship lookups
 // Input should be the sql name of a table like: videos
-func ToManyRelationships(table string, tables []schema.Table) []schema.ToManyRelationship {
+func ToManyRelationships(table string, tables []*schema.Table) []*schema.ToManyRelationship {
 	localTable := schema.GetTable(tables, table)
 
 	return toManyRelationships(localTable, tables)
 }
 
-func toOneRelationships(table schema.Table, tables []schema.Table) []schema.ToOneRelationship {
-	var relationships []schema.ToOneRelationship
-
+func toOneRelationships(table *schema.Table, tables []*schema.Table) (res []*schema.ToOneRelationship) {
 	for _, t := range tables {
 		for _, f := range t.FKeys {
 			if f.ForeignTable == table.Name && !t.IsJoinTable && f.Unique {
-				relationships = append(relationships, buildToOneRelationship(table, f, t, tables))
+				res = append(res, buildToOneRelationship(table, f, t))
 			}
 		}
 	}
 
-	return relationships
+	return res
 }
 
-func toManyRelationships(table schema.Table, tables []schema.Table) []schema.ToManyRelationship {
-	var relationships []schema.ToManyRelationship
-
+func toManyRelationships(table *schema.Table, tables []*schema.Table) (res []*schema.ToManyRelationship) {
 	for _, t := range tables {
 		for _, f := range t.FKeys {
 			if f.ForeignTable == table.Name && (t.IsJoinTable || !f.Unique) {
-				relationships = append(relationships, buildToManyRelationship(table, f, t, tables))
+				res = append(res, buildToManyRelationship(table, f, t))
 			}
 		}
 	}
 
-	return relationships
+	return res
 }
 
 func buildToOneRelationship(
-	localTable schema.Table,
-	foreignKey schema.ForeignKey,
-	foreignTable schema.Table,
-	tables []schema.Table,
-) schema.ToOneRelationship {
-	return schema.ToOneRelationship{
+	localTable *schema.Table,
+	foreignKey *schema.ForeignKey,
+	foreignTable *schema.Table,
+) *schema.ToOneRelationship {
+	return &schema.ToOneRelationship{
 		Name:     foreignKey.Name,
 		Table:    localTable.Name,
 		Column:   foreignKey.ForeignColumn,
@@ -181,13 +174,12 @@ func buildToOneRelationship(
 }
 
 func buildToManyRelationship(
-	localTable schema.Table,
-	foreignKey schema.ForeignKey,
-	foreignTable schema.Table,
-	tables []schema.Table,
-) schema.ToManyRelationship {
+	localTable *schema.Table,
+	foreignKey *schema.ForeignKey,
+	foreignTable *schema.Table,
+) *schema.ToManyRelationship {
 	if !foreignTable.IsJoinTable {
-		return schema.ToManyRelationship{
+		return &schema.ToManyRelationship{
 			Name:                  foreignKey.Name,
 			Table:                 localTable.Name,
 			Column:                foreignKey.ForeignColumn,
@@ -232,5 +224,5 @@ func buildToManyRelationship(
 		relationship.ForeignColumnUnique = fk.ForeignColumnUnique
 	}
 
-	return relationship
+	return &relationship
 }
