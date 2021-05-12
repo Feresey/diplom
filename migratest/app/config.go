@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Feresey/diplom/migratest/schema"
 	"github.com/Feresey/diplom/migratest/schema/driver"
 	"github.com/davecgh/go-spew/spew"
 	"go.uber.org/fx"
@@ -15,7 +14,13 @@ import (
 type Config struct {
 	Migrations MigratorConfig `json:"migrations"`
 	DB         driver.Config  `json:"db"`
-	Schema     schema.Config  `json:"schema"`
+}
+
+func NewDefaultConfig() Config {
+	return Config{
+		Migrations: NewDefaultMigratorConfig(),
+		DB:         driver.NewDefaultConfig(),
+	}
 }
 
 type AppConfig struct {
@@ -23,7 +28,6 @@ type AppConfig struct {
 
 	Migrations MigratorConfig
 	DB         driver.Config
-	Schema     schema.Config
 }
 
 type Flags struct {
@@ -42,13 +46,7 @@ func ParseFlags() *Flags {
 }
 
 func GetConfig(flags *Flags) (*AppConfig, error) {
-	c := &Config{
-		DB:     *driver.NewDefaultConfig(),
-		Schema: *driver.NewDefaultSchemaConfig(),
-		Migrations: MigratorConfig{
-			Path: "./migrations",
-		},
-	}
+	c := NewDefaultConfig()
 
 	configBytes, err := os.ReadFile(flags.ConfigPath)
 	if err != nil {
@@ -63,7 +61,6 @@ func GetConfig(flags *Flags) (*AppConfig, error) {
 	spew.Dump(c)
 	return &AppConfig{
 		DB:         c.DB,
-		Schema:     c.Schema,
 		Migrations: c.Migrations,
 	}, nil
 }

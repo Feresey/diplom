@@ -1,105 +1,124 @@
 package app
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 
-	"github.com/Feresey/diplom/migratest/schema"
 	"github.com/Feresey/diplom/migratest/schema/driver"
+	"go.uber.org/zap"
 )
 
 const PGdumpPath = "pg_dump"
 
-type DumperConfig struct{}
-
 type Dumper struct {
-	c driver.Config
-	d *driver.PostgresDriver
+	logger *zap.Logger
+	c      driver.Config
+	cc     MigrationConfig
+	d      *driver.PostgresDriver
 }
 
 func NewDumper(
 	c driver.Config,
+	logger *zap.Logger,
 	d *driver.PostgresDriver,
-	cc schema.Config,
+	cc MigrationConfig,
 ) *Dumper {
 	return &Dumper{
-		c: c,
-		d: d,
+		logger: logger.Named("dumper"),
+		c:      c,
+		cc:     cc,
+		d:      d,
 	}
 }
 
-func (d *Dumper) Dump(ctx context.Context) (preData, postData string, err error) {
-	preDataFile, err := os.CreateTemp("", "pre-data-dump-*.sql")
+func (d *Dumper) InsertData(ctx context.Context, insertFunc func(ctx context.Context) error) error {
+	dumped, err := d.dump(ctx)
 	if err != nil {
-		return "", "", fmt.Errorf("create pre-data temp file: %w", err)
-	}
-	_ = preDataFile.Close()
-
-	postDataFile, err := os.CreateTemp("", "post-data-dump-*.sql")
-	if err != nil {
-		return "", "", fmt.Errorf("create post-data temp file: %w", err)
-	}
-	_ = postDataFile.Close()
-
-	commandArgs := []string{
-		"-d", d.c.DBName,
-		"-h", d.c.Host,
-		"-p", strconv.Itoa(d.c.Port),
-		"-U", d.c.Credentials.Username,
-		"-f", preDataFile.Name(),
-	}
-	env := append(os.Environ(), "PGPASSWORD="+d.c.Credentials.Password)
-
-	cmdPreData := exec.CommandContext(
-		ctx,
-		PGdumpPath,
-		append(commandArgs, "--section=pre-data")...,
-	)
-	cmdPreData.Env = env
-
-	if err := cmdPreData.Run(); err != nil {
-		return "", "", fmt.Errorf("fetch pre-data: %w", err)
+		return fmt.Errorf("create dump: %w", err)
 	}
 
-	cmdPostData := exec.CommandContext(
-		ctx,
-		PGdumpPath,
-		append(commandArgs, "--section=post-data")...,
-	)
-	cmdPostData.Env = env
-
-	if err := cmdPostData.Run(); err != nil {
-		return "", "", fmt.Errorf("fetch post-data: %w", err)
+	scanner := bufio.NewScanner(strings.NewReader(dumped))
+	offset := 0
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "Type: CONSTRAINT") {
+			break
+		}
+		offset += len(line) + 1
 	}
 
-	return preDataFile.Name(), postDataFile.Name(), nil
-}
+	preData := dumped[:offset]
+	postData := dumped[offset:]
 
-func (d *Dumper) RestoreDump(ctx context.Context, preData, insertData, postData string) error {
-	raw, err := os.ReadFile(preData)
-	if err != nil {
-		return fmt.Errorf("read pre-data script: %w", err)
-	}
-	if _, err := d.d.Conn.Exec(ctx, string(raw)); err != nil {
-		return fmt.Errorf("create tables: %w", err)
-	}
-
-	raw, err = os.ReadFile(insertData)
-	if err != nil {
-		return fmt.Errorf("read data insert script: %w", err)
-	}
-	if _, err := d.d.Conn.Exec(ctx, string(raw)); err != nil {
+	if err := d.restoreDump(ctx, preData, postData, insertFunc); err != nil {
 		return fmt.Errorf("insert data: %w", err)
 	}
 
-	raw, err = os.ReadFile(postData)
-	if err != nil {
-		return fmt.Errorf("read post-data script: %w", err)
+	return nil
+}
+
+func (d *Dumper) dump(ctx context.Context) (raw string, err error) {
+	var commandArgs []string
+	for _, allow := range d.cc.Patterns.Whitelist {
+		commandArgs = append(commandArgs, "-n", allow)
 	}
-	if _, err := d.d.Conn.Exec(ctx, string(raw)); err != nil {
+	for _, block := range d.cc.Patterns.Blacklist {
+		commandArgs = append(commandArgs, "-N", block)
+	}
+
+	var buf bytes.Buffer
+
+	cmd := exec.CommandContext(
+		ctx,
+		PGdumpPath,
+		append(commandArgs,
+			"-d", d.c.DBName,
+			"-h", d.c.Host,
+			"-p", strconv.Itoa(d.c.Port),
+			"-U", d.c.Credentials.Username,
+			"--section=pre-data",
+			"--section=post-data",
+			// добавляет команды типа DROP TABLE some_table, чтобы можно было пересоздать таблицы без индексов.
+			"--clean",
+			// вывод на stdout
+			"-f", "-",
+		)...,
+	)
+
+	// TODO this is insecure
+	cmd.Env = append(os.Environ(), "PGPASSWORD="+d.c.Credentials.Password)
+	cmd.Stdout = &buf
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("run pg_dump: %w", err)
+	}
+	return buf.String(), nil
+}
+
+func (d *Dumper) restoreDump(
+	ctx context.Context,
+	preData, postData string,
+	insertData func(context.Context) error,
+) error {
+	if _, err := d.d.Conn.Exec(ctx, preData); err != nil {
+		return fmt.Errorf("create tables: %w", err)
+	}
+
+	// TODO pre-inserted data ???
+
+	if insertData != nil {
+		if err := insertData(ctx); err != nil {
+			return fmt.Errorf("insert data: %w", err)
+		}
+	}
+
+	if _, err := d.d.Conn.Exec(ctx, postData); err != nil {
 		return fmt.Errorf("create indexes: %w", err)
 	}
 

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/Feresey/diplom/migratest/schema"
 )
 
 type UserInfo struct {
@@ -46,8 +44,8 @@ func (c *Config) FormatDSN() string {
 	return strings.Join(values, " ")
 }
 
-func NewDefaultConfig() *Config {
-	return &Config{
+func NewDefaultConfig() Config {
+	return Config{
 		Credentials: UserInfo{
 			Username: "postgres",
 			Password: "pass",
@@ -57,18 +55,6 @@ func NewDefaultConfig() *Config {
 		DBName: "test",
 		Params: map[string]string{
 			"sslmode": "disable",
-		},
-	}
-}
-
-func NewDefaultSchemaConfig() *schema.Config {
-	return &schema.Config{
-		Patterns: schema.SchemaPatterns{
-			Whitelist: []string{"public"},
-			Blacklist: []string{"pg_*", "information_schema"},
-		},
-		ConcreteConfig: []schema.SchemaSettings{
-			{SchemaName: "public"},
 		},
 	}
 }

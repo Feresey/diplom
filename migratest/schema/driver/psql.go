@@ -66,7 +66,31 @@ func NewPostgresDriver(in In) (*PostgresDriver, error) {
 	return driver, nil
 }
 
-func (p *PostgresDriver) ParseSchema(ctx context.Context, sc schema.SchemaSettings) (dbinfo []*schema.Table, err error) {
+func (p *PostgresDriver) GetSchemas(ctx context.Context) ([]string, error) {
+	rows, err := p.Conn.Query(ctx, `SELECT schema_name FROM information_schema.schemata`)
+	if err != nil {
+		return nil, fmt.Errorf("create get schemas query: %w", err)
+	}
+	defer rows.Close()
+
+	var res []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("scan schema name: %w", err)
+		}
+		res = append(res, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("scan rows error: %w", err)
+	}
+	return res, nil
+}
+
+func (p *PostgresDriver) ParseSchema(
+	ctx context.Context,
+	sc schema.SchemaSettings,
+) (dbinfo []*schema.Table, err error) {
 	err = p.getVersion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get database version: %w", err)

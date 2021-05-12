@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/friendsofgo/errors v0.9.2 // indirect
+	github.com/gobwas/glob v0.2.3
 	github.com/golang-migrate/migrate/v4 v4.14.1
 	github.com/jackc/pgx/v4 v4.11.0
 	github.com/stretchr/testify v1.5.1
