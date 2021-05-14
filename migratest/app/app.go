@@ -78,7 +78,7 @@ func (app *App) GenerateData(
 ) (map[string]TableRecords, error) {
 	schemas, err := app.driver.GetSchemas(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get schemas: %w", err)
 	}
 	app.logger.Debug("database schemas", zap.Strings("schemas", schemas))
 
@@ -200,7 +200,9 @@ func (app *App) InsertData(data map[string]TableRecords) func(ctx context.Contex
 	}
 }
 
-func (app *App) GetSchemaConfigs(cnf MigrationSettings, schemas []string) []schema.SchemaSettings {
+// GetSchemaConfigs достаёт из базы имена схем и сопоставляет их шаблонам и конкретным конфигам
+// TODO split
+func (app *App) GetSchemaConfigs(cnf MigrationSettings, schemas []string) []schema.Settings {
 	var allow, block []glob.Glob
 
 	for _, pattern := range cnf.Migration.Patterns.Whitelist {
@@ -237,20 +239,20 @@ SCHEMAS_LOOP:
 		}
 	}
 
-	concreteConfigs := make(map[string]schema.SchemaSettings)
+	concreteConfigs := make(map[string]schema.Settings)
 
 	for _, concrete := range cnf.Migration.ConcreteConfigs {
 		concreteConfigs[concrete.SchemaName] = concrete
 	}
 
-	resultConfigs := make([]schema.SchemaSettings, len(concreteConfigs))
+	resultConfigs := make([]schema.Settings, len(concreteConfigs), 0)
 
 	for _, schemaName := range resultSchemas {
 		concrete, ok := concreteConfigs[schemaName]
 		if ok {
 			resultConfigs = append(resultConfigs, concrete)
 		} else {
-			resultConfigs = append(resultConfigs, schema.SchemaSettings{
+			resultConfigs = append(resultConfigs, schema.Settings{
 				SchemaName: schemaName,
 			})
 		}

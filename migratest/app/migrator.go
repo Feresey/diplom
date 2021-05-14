@@ -26,9 +26,9 @@ import (
 // MigrationConfig для версии миграции
 type MigrationConfig struct {
 	// Patterns это маска для имени схем. Тут имеется ввиду именно PostgreSQL SCHEMA.
-	Patterns schema.SchemaPatterns `json:"patterns,omitempty"`
+	Patterns schema.Patterns `json:"patterns,omitempty"`
 	// ConcreteConfigs - настройки для конкретных схем. Я хз нужно это или нет.
-	ConcreteConfigs []schema.SchemaSettings `json:"concrete_config,omitempty"`
+	ConcreteConfigs []schema.Settings `json:"concrete_config,omitempty"`
 }
 
 func (mc *MigrationConfig) Copy() MigrationConfig {
@@ -39,7 +39,7 @@ func (mc *MigrationConfig) Copy() MigrationConfig {
 	copy(res.Patterns.Blacklist, mc.Patterns.Blacklist)
 	copy(res.Patterns.Whitelist, mc.Patterns.Whitelist)
 
-	res.ConcreteConfigs = make([]schema.SchemaSettings, len(mc.ConcreteConfigs))
+	res.ConcreteConfigs = make([]schema.Settings, len(mc.ConcreteConfigs))
 	for idx, val := range mc.ConcreteConfigs {
 		cnf := res.ConcreteConfigs[idx]
 
@@ -56,11 +56,11 @@ func (mc *MigrationConfig) Copy() MigrationConfig {
 
 func NewDefaultMigrationConfig() MigrationConfig {
 	return MigrationConfig{
-		Patterns: schema.SchemaPatterns{
+		Patterns: schema.Patterns{
 			Whitelist: []string{"*"},
 			Blacklist: []string{"pg_*", "information_schema"},
 		},
-		ConcreteConfigs: []schema.SchemaSettings{
+		ConcreteConfigs: []schema.Settings{
 			{SchemaName: "public"},
 		},
 	}
@@ -142,6 +142,7 @@ func (mc *MigratorConfig) GetVersionConfig(indexes []int, version int) Migration
 		return MigrationSettings{
 			Migration:        NewDefaultMigrationConfig(),
 			SkipOlderConfigs: false,
+			Generator:        GeneratorConfig{},
 		}
 	}
 	res := mc.Settings[indexes[0]].Copy()

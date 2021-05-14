@@ -24,6 +24,7 @@ type Config struct {
 	Params map[string]string `json:"params,omitempty"`
 }
 
+// FormatDSN as
 // user=jack password=secret host=pg.example.com port=5432 dbname=mydb sslmode=verify-ca pool_max_conns=10
 func (c *Config) FormatDSN() string {
 	formatDSNItem := func(name, value string) string {

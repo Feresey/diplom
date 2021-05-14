@@ -37,7 +37,7 @@ func NewDumper(
 
 func (d *Dumper) InsertData(
 	ctx context.Context,
-	sp schema.SchemaPatterns,
+	sp schema.Patterns,
 	insertFunc func(ctx context.Context) error,
 ) error {
 	dumped, err := d.dump(ctx, sp)
@@ -46,7 +46,6 @@ func (d *Dumper) InsertData(
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader(dumped))
-	constraintOffset := 0
 	dataOffset := 0
 
 	for scanner.Scan() {
@@ -59,7 +58,8 @@ func (d *Dumper) InsertData(
 			break
 		}
 	}
-	constraintOffset = dataOffset
+
+	constraintOffset := dataOffset
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.Contains(line, "Type: CONSTRAINT") {
@@ -79,7 +79,7 @@ func (d *Dumper) InsertData(
 	return nil
 }
 
-func (d *Dumper) dump(ctx context.Context, sp schema.SchemaPatterns) (raw string, err error) {
+func (d *Dumper) dump(ctx context.Context, sp schema.Patterns) (raw string, err error) {
 	var commandArgs []string
 	for _, allow := range sp.Whitelist {
 		commandArgs = append(commandArgs, "-n", allow)
@@ -90,23 +90,21 @@ func (d *Dumper) dump(ctx context.Context, sp schema.SchemaPatterns) (raw string
 
 	var buf bytes.Buffer
 
-	cmd := exec.CommandContext(
-		ctx,
-		PGdumpPath,
-		append(commandArgs,
-			"-d", d.c.DBName,
-			"-h", d.c.Host,
-			"-p", strconv.Itoa(d.c.Port),
-			"-U", d.c.Credentials.Username,
-			"--insert",
-			// "--section=pre-data",
-			// "--section=post-data",
-			// добавляет команды типа DROP TABLE some_table, чтобы можно было пересоздать таблицы без индексов.
-			"--clean",
-			// вывод на stdout
-			"-f", "-",
-		)...,
+	commandArgs = append(commandArgs,
+		"-d", d.c.DBName,
+		"-h", d.c.Host,
+		"-p", strconv.Itoa(d.c.Port),
+		"-U", d.c.Credentials.Username,
+		"--insert",
+		// "--section=pre-data",
+		// "--section=post-data",
+		// добавляет команды типа DROP TABLE some_table, чтобы можно было пересоздать таблицы без индексов.
+		"--clean",
+		// вывод на stdout
+		"-f", "-",
 	)
+
+	cmd := exec.CommandContext(ctx, PGdumpPath, commandArgs...)
 
 	// TODO this is insecure
 	cmd.Env = append(os.Environ(), "PGPASSWORD="+d.c.Credentials.Password)

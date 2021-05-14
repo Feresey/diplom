@@ -1,7 +1,7 @@
 package schema
 
-// SchemaSettings настройки для конкретной схемы.
-type SchemaSettings struct {
+// Settings настройки для конкретной схемы.
+type Settings struct {
 	// SchemaName логично что имя схемы.
 	SchemaName string `json:"name,omitempty"`
 	// Blacklist список таблиц, про которые знать не надо.
@@ -10,8 +10,8 @@ type SchemaSettings struct {
 	Whitelist []string `json:"whitelist,omitempty"`
 }
 
-// SchemaPatterns работают как обычный glob.
-type SchemaPatterns struct {
+// Patterns работают как обычный glob.
+type Patterns struct {
 	Whitelist []string
 	Blacklist []string
 }

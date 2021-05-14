@@ -89,7 +89,7 @@ func (p *PostgresDriver) GetSchemas(ctx context.Context) ([]string, error) {
 
 func (p *PostgresDriver) ParseSchema(
 	ctx context.Context,
-	sc schema.SchemaSettings,
+	sc schema.Settings,
 ) (dbinfo []*schema.Table, err error) {
 	err = p.getVersion(ctx)
 	if err != nil {
@@ -109,12 +109,12 @@ func (p *PostgresDriver) getVersion(ctx context.Context) error {
 	var version string
 	row := p.Conn.QueryRow(ctx, "SHOW server_version_num")
 	if err := row.Scan(&version); err != nil {
-		return err
+		return fmt.Errorf("scan database version: %w", err)
 	}
 
 	v, err := strconv.Atoi(version)
 	if err != nil {
-		return err
+		return fmt.Errorf("convert database version to number: %q: %w", version, err)
 	}
 	p.version = v
 	return nil
@@ -139,7 +139,10 @@ func tablesFromList(list []string) []string {
 	return tables
 }
 
-func (p *PostgresDriver) filterTables(sc schema.SchemaSettings, query string, args ...interface{}) (string, []interface{}) {
+func (p *PostgresDriver) filterTables(
+	sc schema.Settings,
+	query string, args ...interface{},
+) (string, []interface{}) {
 	if wl := sc.Whitelist; len(wl) > 1 {
 		tables := tablesFromList(wl)
 		if len(tables) > 0 {
@@ -163,7 +166,7 @@ func (p *PostgresDriver) filterTables(sc schema.SchemaSettings, query string, ar
 // TableNames connects to the postgres database and
 // retrieves all table names from the information_schema where the
 // table schema is schema. It uses a whitelist and blacklist.
-func (p *PostgresDriver) TableNames(ctx context.Context, sc schema.SchemaSettings) ([]string, error) {
+func (p *PostgresDriver) TableNames(ctx context.Context, sc schema.Settings) ([]string, error) {
 	var names []string
 
 	query := `
@@ -211,8 +214,11 @@ WHERE
 		}
 		names = append(names, name)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows err: %w", err)
+	}
 
-	return names, rows.Err()
+	return names, nil
 }
 
 //go:embed columns.sql
@@ -222,7 +228,11 @@ var allColumnsQuery string
 // from the database information_schema.columns. It retrieves the column names
 // and column types and returns those aS a []Column after TranslateColumnType()
 // converts the SQL types to Go types, for example: "varchar" to "string"
-func (p *PostgresDriver) Columns(ctx context.Context, sc schema.SchemaSettings, tableName string) (res []*schema.Column, err error) {
+func (p *PostgresDriver) Columns(
+	ctx context.Context,
+	sc schema.Settings,
+	tableName string,
+) (res []*schema.Column, err error) {
 	rows, err := p.Conn.Query(ctx, allColumnsQuery, sc.SchemaName, tableName)
 	if err != nil {
 		return nil, fmt.Errorf("create all columns query: %w", err)
@@ -258,7 +268,11 @@ func (p *PostgresDriver) Columns(ctx context.Context, sc schema.SchemaSettings, 
 }
 
 // PrimaryKeyInfo looks up the primary key for a table.
-func (p *PostgresDriver) PrimaryKeyInfo(ctx context.Context, sc schema.SchemaSettings, tableName string) (*schema.PrimaryKey, error) {
+func (p *PostgresDriver) PrimaryKeyInfo(
+	ctx context.Context,
+	sc schema.Settings,
+	tableName string,
+) (*schema.PrimaryKey, error) {
 	pkey := &schema.PrimaryKey{}
 	var err error
 
@@ -320,7 +334,7 @@ ORDER BY
 }
 
 // ForeignKeyInfo retrieves the foreign keys for a given table name.
-func (p *PostgresDriver) ForeignKeyInfo(ctx context.Context, sc schema.SchemaSettings, tableName string) (fkeys []*schema.ForeignKey, err error) {
+func (p *PostgresDriver) ForeignKeyInfo(ctx context.Context, sc schema.Settings, tableName string) (fkeys []*schema.ForeignKey, err error) {
 	whereConditions := []string{"pgn.nspname = $2", "pgc.relname = $1", "pgcon.contype = 'f'"}
 	if p.version >= 120000 {
 		whereConditions = append(whereConditions, "pgasrc.attgenerated = ''", "pgadst.attgenerated = ''")

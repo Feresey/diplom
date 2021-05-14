@@ -12,7 +12,7 @@ import (
 
 // Tables returns the metadata for all tables, minus the tables
 // specified in the blacklist.
-func (p *PostgresDriver) Tables(ctx context.Context, sc schema.SchemaSettings) ([]*schema.Table, error) {
+func (p *PostgresDriver) Tables(ctx context.Context, sc schema.Settings) ([]*schema.Table, error) {
 	var err error
 
 	names, err := p.TableNames(ctx, sc)
@@ -61,7 +61,7 @@ func (p *PostgresDriver) Tables(ctx context.Context, sc schema.SchemaSettings) (
 }
 
 // filterForeignKeys filter FK whose ForeignTable is not in whitelist or in blacklist.
-func (p *PostgresDriver) filterForeignKeys(t *schema.Table, sc schema.SchemaSettings) {
+func (p *PostgresDriver) filterForeignKeys(t *schema.Table, sc schema.Settings) {
 	var fkeys []*schema.ForeignKey
 	for _, fkey := range t.FKeys {
 		if (len(sc.Whitelist) == 0 || strmangle.SetInclude(fkey.ForeignTable, sc.Whitelist)) &&
@@ -115,7 +115,7 @@ func setRelationships(t *schema.Table, tables []*schema.Table) {
 }
 
 // ToOneRelationships relationship lookups
-// Input should be the sql name of a table like: videos
+// Input should be the sql name of a table like: videos.
 func ToOneRelationships(table string, tables []*schema.Table) []*schema.ToOneRelationship {
 	localTable := schema.GetTable(tables, table)
 
@@ -123,7 +123,7 @@ func ToOneRelationships(table string, tables []*schema.Table) []*schema.ToOneRel
 }
 
 // ToManyRelationships relationship lookups
-// Input should be the sql name of a table like: videos
+// Input should be the sql name of a table like: videos.
 func ToManyRelationships(table string, tables []*schema.Table) []*schema.ToManyRelationship {
 	localTable := schema.GetTable(tables, table)
 
