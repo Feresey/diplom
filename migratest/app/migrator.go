@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 
 	"go.uber.org/fx"
@@ -127,7 +128,7 @@ func NewDefaultMigratorConfig() MigratorConfig {
 }
 
 func (mc *MigratorConfig) GetVersionSettingsIndexes() []int {
-	res := make([]int, len(mc.Settings), 0)
+	var res []int
 	for idx := range mc.Settings {
 		res = append(res, idx)
 	}
@@ -161,6 +162,19 @@ type Migrator struct {
 	sourceInstance source.Driver
 }
 
+type mlogger struct {
+	logger  *zap.Logger
+	verbose bool
+}
+
+func (m *mlogger) Printf(format string, args ...interface{}) {
+	m.logger.Info(fmt.Sprintf(format, args...))
+}
+
+func (m *mlogger) Verbose() bool {
+	return m.verbose
+}
+
 func NewMigrator(
 	lc fx.Lifecycle,
 	config MigratorConfig,
@@ -190,6 +204,7 @@ func NewMigrator(
 			}
 
 			mm.m = migrator
+			migrator.Log = &mlogger{logger: logger, verbose: true}
 			return nil
 		},
 		OnStop: mm.Shutdown,
@@ -208,9 +223,8 @@ func (m *Migrator) GetVersion() (int, error) {
 	version, dirty, err := m.m.Version()
 	if err != nil {
 		if !errors.Is(err, migrate.ErrNilVersion) {
-			return 0, fmt.Errorf("get database version: %w", err)
+			return int(version), fmt.Errorf("get database version: %w", err)
 		}
-		return 0, nil
 	}
 	if dirty {
 		err = fmt.Errorf("database is dirty: %w", migrate.ErrDirty{Version: int(version)})
@@ -222,6 +236,10 @@ func (m *Migrator) GetVersion() (int, error) {
 func (m *Migrator) Up() (noChange bool, err error) {
 	err = m.m.Steps(1)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			m.logger.Warn("next migration not found")
+			return true, nil
+		}
 		if errors.Is(err, migrate.ErrNoChange) {
 			// TODO do something
 			m.logger.Info("max migrations reached")

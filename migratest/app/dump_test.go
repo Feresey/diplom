@@ -14,6 +14,8 @@ import (
 )
 
 func TestDump(t *testing.T) {
+	// TODO протестировать на гидре
+
 	cnf := driver.Config{
 		Credentials: driver.UserInfo{
 			Username: "postgres",
@@ -21,8 +23,10 @@ func TestDump(t *testing.T) {
 		},
 		Host:   "localhost",
 		Port:   5432,
-		DBName: "test",
+		DBName: "hydra",
 	}
+
+	cc := NewDefaultMigrationConfig()
 
 	var d *Dumper
 
@@ -45,6 +49,6 @@ func TestDump(t *testing.T) {
 
 	ctx := context.Background()
 
-	err := d.InsertData(ctx, nil)
+	err := d.InsertData(ctx, cc.Patterns, nil)
 	require.NoError(t, err)
 }

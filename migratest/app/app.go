@@ -3,7 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
-	"time"
+	"os/signal"
+	"syscall"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -52,24 +53,18 @@ func New(logger *zap.Logger, conf *AppConfig, flags *Flags) *App {
 }
 
 func (app *App) Run() error {
-	// TODO контексты надо на сигналы навесить
-
-	startCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
-	if err := app.app.Start(startCtx); err != nil {
+
+	if err := app.app.Start(ctx); err != nil {
 		return fmt.Errorf("start application failed: %w", err)
 	}
 
-	runCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := app.run(runCtx); err != nil {
+	if err := app.run(ctx); err != nil {
 		return err
 	}
 
-	stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := app.app.Stop(stopCtx); err != nil {
+	if err := app.app.Stop(ctx); err != nil {
 		return fmt.Errorf("stop application failed: %w", err)
 	}
 
@@ -115,9 +110,9 @@ func (app *App) run(ctx context.Context) error {
 		1. get database version
 		2. migrate up if database is clean, else skip
 		3. get config for migrations:
-		    - get schemas
-		    - get tables
-		    - generate data
+		   - get schemas
+		   - get tables
+		   - generate data
 		3. dump schema
 		4. restore schema + insert data
 		5. migrate up
@@ -151,15 +146,17 @@ func (app *App) run(ctx context.Context) error {
 			return err
 		}
 
-		if err := app.dumper.InsertData(ctx, app.InsertData(data)); err != nil {
+		if err := app.dumper.InsertData(ctx, cnf.Migration.Patterns, app.InsertData(data)); err != nil {
 			return fmt.Errorf("create dump: %w", err)
 		}
 
+		app.logger.Info("upgrade migration", zap.Int("next_version", version+1))
 		// migrate up with data
 		if _, err := app.m.Up(); err != nil {
 			return err
 		}
 
+		app.logger.Info("downgrade with data", zap.Int("prev_version", version))
 		// migrate down with data
 		if err := app.m.Down(); err != nil {
 			return err
@@ -167,10 +164,17 @@ func (app *App) run(ctx context.Context) error {
 
 		// TODO check data
 
+		app.logger.Info("upgrade migration back", zap.Int("next_version", version+1))
 		// turn back to current version
 		if _, err := app.m.Up(); err != nil {
 			return err
 		}
+
+		version, err = app.m.GetVersion()
+		if err != nil {
+			return err
+		}
+		app.logger.Info("current database version", zap.Int("version", version))
 	}
 }
 

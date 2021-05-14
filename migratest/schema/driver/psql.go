@@ -43,7 +43,7 @@ func NewPostgresDriver(in In) (*PostgresDriver, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 	cnf.Logger = zapadapter.NewLogger(logger.Named("pgx"))
-	cnf.LogLevel = pgx.LogLevelInfo
+	cnf.LogLevel = pgx.LogLevelWarn
 
 	driver := &PostgresDriver{
 		logger: logger,

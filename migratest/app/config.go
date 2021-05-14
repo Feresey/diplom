@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Feresey/diplom/migratest/schema/driver"
 	"github.com/davecgh/go-spew/spew"
 	"go.uber.org/fx"
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml"
+
+	"github.com/Feresey/diplom/migratest/schema/driver"
 )
 
 type Config struct {
@@ -53,7 +54,7 @@ func GetConfig(flags *Flags) (*AppConfig, error) {
 		return nil, fmt.Errorf("open config file: %w", err)
 	}
 
-	err = yaml.Unmarshal(configBytes, c)
+	err = yaml.Unmarshal(configBytes, &c)
 	if err != nil {
 		return nil, fmt.Errorf("decode yaml: %w", err)
 	}

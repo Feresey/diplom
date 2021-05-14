@@ -13,5 +13,5 @@ require (
 	go.uber.org/fx v1.13.1
 	go.uber.org/multierr v1.5.0
 	go.uber.org/zap v1.13.0
-	gopkg.in/yaml.v2 v2.2.8
+	sigs.k8s.io/yaml v1.1.0
 )

@@ -11,6 +11,10 @@ type UserInfo struct {
 	Password string `json:"password,omitempty"`
 }
 
+func (u *UserInfo) String() string {
+	return "secret"
+}
+
 type Config struct {
 	Credentials UserInfo `json:"credentials,omitempty"`
 	Host        string   `json:"host,omitempty"`
