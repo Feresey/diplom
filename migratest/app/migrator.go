@@ -242,8 +242,7 @@ func (m *Migrator) Up() (noChange bool, err error) {
 			return true, nil
 		}
 		if errors.Is(err, migrate.ErrNoChange) {
-			// TODO do something
-			m.logger.Info("max migrations reached")
+			m.logger.Debug("nothing changed")
 			return true, nil
 		}
 		return false, fmt.Errorf("migrate up: %w", err)
