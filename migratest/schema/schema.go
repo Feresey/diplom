@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"context"
+
 	"github.com/Masterminds/squirrel"
 )
 
@@ -60,8 +62,34 @@ type Table struct {
 	Constraints []Constraint
 }
 
-func (p *Parser) GetTables(schema string) ([]Table, error) {
+func (p *Parser) GetTables(ctx context.Context, schema string) ([]Table, error) {
 	q := p.sb.From("pg_tables").
 		Columns("tablename").
 		Where("schemaname = ?", schema)
+
+	tables, err := QueryAll(ctx, p.db.Conn, q, func(s Scanner, t *Table) error {
+		return s.Scan(&t.Name)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return tables, nil
 }
+
+func (p *Parser) GetTables(ctx context.Context, schema string) ([]Table, error) {
+	q := p.sb.From("pg_tables").
+		Columns("tablename").
+		Where("schemaname = ?", schema)
+
+	tables, err := QueryAll(ctx, p.db.Conn, q, func(s Scanner, t *Table) error {
+		return s.Scan(&t.Name)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return tables, nil
+}
+
+
