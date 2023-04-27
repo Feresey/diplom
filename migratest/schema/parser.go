@@ -12,21 +12,19 @@ type ParserConfig struct {
 }
 
 type Parser struct {
-	c  ParserConfig
 	db DBConn
 
 	schema *Schema
 }
 
-func NewParser(c ParserConfig, db DBConn) *Parser {
+func NewParser(db DBConn) *Parser {
 	return &Parser{
-		c:  c,
 		db: db,
 	}
 }
 
-func (p *Parser) LoadSchema(ctx context.Context) error {
-	if err := p.LoadTables(ctx); err != nil {
+func (p *Parser) LoadSchema(ctx context.Context, schemas []string) error {
+	if err := p.LoadTables(ctx, schemas); err != nil {
 		return err
 	}
 	p.schema.setTableNames()
@@ -43,7 +41,7 @@ func (p *Parser) LoadSchema(ctx context.Context) error {
 	return nil
 }
 
-func (p *Parser) LoadTables(ctx context.Context) error {
+func (p *Parser) LoadTables(ctx context.Context, schemas []string) error {
 	q := NewQuery[Table](`
 		SELECT
 			schemaname,
@@ -51,7 +49,7 @@ func (p *Parser) LoadTables(ctx context.Context) error {
 		FROM
 			pg_tables
 		WHERE
-			schemaname = ANY($1)`, p.c.Schemas)
+			schemaname = ANY($1)`, schemas)
 
 	tables, err := q.AllRet(ctx, p.db.Conn, func(s pgx.Rows) (Table, error) {
 		t := Table{
@@ -97,9 +95,8 @@ func (p *Parser) LoadTablesColumns(ctx context.Context) error {
 		FROM
 			information_schema.columns
 		WHERE
-			table_schema = ANY($1)
-			AND table_name = ANY($2)
-		`, p.c.Schemas, p.schema.TableNames)
+			'"' || nr.nspname || '"."' || r.relname || '"' = ANY($1)`,
+		p.schema.TableNames)
 
 	columns, err := q.All(ctx, p.db.Conn,
 		func(s pgx.Rows, c *tableColumn) error {
@@ -137,29 +134,30 @@ func (p *Parser) LoadTablesColumns(ctx context.Context) error {
 
 func (p *Parser) LoadConstraints(ctx context.Context) error {
 	type constraint struct {
-		table          string
+		table          Identifier
 		constraint     string
 		constraintType string
 	}
 	q := NewQuery[constraint](`
 		SELECT
+			nr.nspname AS table_schema,
 			r.relname AS table_name,
 			c.conname AS constraint_name,
 			c.contype AS constraint_type
 		FROM
 			pg_constraint c
 			JOIN pg_class r ON c.conrelid = r.oid
-			JOIN pg_namespace nr ON no.oid = r.relnamespace AND c.conrelid = r.oid
+			JOIN pg_namespace nr ON nr.oid = r.relnamespace AND c.conrelid = r.oid
 		WHERE
-			nr.nspname = ANY($1)
-			AND r.relname = ANY($2)`,
-		p.c.Schemas, p.schema.TableNames,
+			'"' || nr.nspname || '"."' || r.relname || '"' = ANY($1)`,
+		p.schema.TableNames,
 	)
 
 	constraints, err := q.All(ctx, p.db.Conn,
 		func(s pgx.Rows, c *constraint) error {
 			return s.Scan(
-				&c.table,
+				&c.table.Schema,
+				&c.table.Name,
 				&c.constraint,
 				&c.constraintType,
 			)
@@ -170,28 +168,32 @@ func (p *Parser) LoadConstraints(ctx context.Context) error {
 
 	p.schema.Constraints = make(map[string]*Constraint, len(constraints))
 	for _, constraint := range constraints {
-		table, ok := p.schema.Tables[constraint.table]
+		table, ok := p.schema.Tables[constraint.table.String()]
 		if !ok {
 			return fmt.Errorf("unable to find table %q", constraint.table)
 		}
 		c := Constraint{
-			Identifier:   constraint.constraint,
-			Table:        constraint.table,
-			TableColumns: make(map[string]*Column),
+			Name: Identifier{
+				Schema: constraint.table.Schema,
+				Name:   constraint.constraint,
+			},
+			Table:   table,
+			Columns: make(map[string]*Column),
 		}
 		if err := c.SetType(constraint.constraintType); err != nil {
 			return err
 		}
 
-		table.Constraints[c.Identifier] = &c
-		p.schema.Constraints[c.Identifier] = &c
+		table.Constraints[c.Name.String()] = &c
+		p.schema.Constraints[c.Name.String()] = &c
 
 		switch c.Type {
 		case ConstraintTypePK:
 			table.PrimaryKey = &c
 		case ConstraintTypeFK:
+			// FIXME
 			// для FK запрос отдаёт таблицу, на которую этот FK ссылается
-			table.ReferencedBy[c.Identifier] = &c
+			table.ReferencedBy[c.Name.String()] = &c
 		}
 	}
 
@@ -212,10 +214,9 @@ func (p *Parser) LoadConstraintsColumns(ctx context.Context) error {
 			FROM
 				information_schema.constraint_column_usage
 			WHERE
-				table_schema = ANY($1)
-				AND table_name = ANY($2)
-				AND constraint_name = ANY($3)`,
-		p.c.Schemas, p.schema.TableNames, p.schema.ConstraintNames)
+				'"' || table_schema || '"."' || table_name || '"' = ANY($1)
+				AND constraint_name = ANY($2)`,
+		p.schema.TableNames, p.schema.ConstraintNames)
 
 	constraintsColumns, err := q.All(ctx, p.db.Conn,
 		func(s pgx.Rows, c *constraintColumn) error {
@@ -247,70 +248,69 @@ func (p *Parser) LoadConstraintsColumns(ctx context.Context) error {
 				constraintColumn.constraint,
 			)
 		}
-		constraint.TableColumns[constraintColumn.column] = column
+		constraint.Columns[constraintColumn.column] = column
 	}
 
 	return nil
 }
 
 func (p *Parser) LoadForeignConstraints(ctx context.Context) error {
-	type tableColumn struct {
-		schema string
-		name   string
-		column string
-	}
-
 	type foreignConstraint struct {
-		name    string
-		schema  string
-		local   tableColumn
-		foreign tableColumn
+		foreign Identifier
+		unique  Identifier
 	}
 
 	q := NewQuery[foreignConstraint](`
 		SELECT
-			tc.table_name,
-			kcu.column_name,
-			ccu.table_schema AS foreign_table_schema,
-			ccu.table_name AS foreign_table_name,
-			ccu.column_name AS foreign_column_name
+			constraint_schema,
+			constraint_name,
+			unique_constraint_schema,
+			unique_constraint_name,
+			match_option,
+			update_rule,
+			delete_rule
 		FROM
-			information_schema.constraints AS tc
-		JOIN
-			information_schema.key_column_usage AS kcu
-			ON
-				tc.constraint_name = kcu.constraint_name
-				AND tc.table_schema = kcu.table_schema
-		JOIN
-			information_schema.constraint_column_usage AS ccu
-			ON
-				ccu.constraint_name = tc.constraint_name
-				AND ccu.table_schema = tc.table_schema
+			information_schema.referential_constraints
 		WHERE
-			tc.constraint_type = 'FOREIGN KEY'
-			AND tc.table_schema = $1
-			AND tc.table_name = ANY($2)`,
-		p.c.Schema, p.schema.TableNames,
+			AND '"' || constraint_schema || '"."' || constraint_name || '"' = ANY($1)`,
+		p.schema.ConstraintNames,
 	)
 
 	foreignKeys, err := q.All(ctx, p.db.Conn,
 		func(s pgx.Rows, fc *foreignConstraint) error {
 			return s.Scan(
-				&c.table,
-				&c.column,
-				&c.constraint,
+				&fc.foreign.Schema,
+				&fc.foreign.Name,
+				&fc.unique.Schema,
+				&fc.unique.Name,
+				nil,
+				nil,
+				nil,
 			)
 		})
 	if err != nil {
 		return err
 	}
 
-	for _, constraintColumn := range foreignKeys {
-		constraint, ok := p.schema.Constraints[constraintColumn.constraint]
+	for _, keys := range foreignKeys {
+		fk, ok := p.schema.Constraints[keys.foreign.String()]
 		if !ok {
-			return fmt.Errorf("constraint %q not found", constraintColumn.constraint)
+			return fmt.Errorf("constraint %q not found", keys.foreign)
 		}
-		constraint.Columns[constraintColumn.table] = constraintColumn.column
+
+		uniq, ok := p.schema.Constraints[keys.unique.String()]
+		if !ok {
+			return fmt.Errorf("constraint %q not found", keys.foreign)
+		}
+
+		// FIXME
+		// таблица, в которой есть FK
+		uniq.Table.ForeignKeys[fk.Name.String()] = ForeignKey{
+			Uniq:    uniq,
+			Foreign: fk,
+		}
+		// таблица, на которую ссылаются
+		fk.Table.ReferencedBy[uniq.Name.String()] = uniq
 	}
 
 	return nil

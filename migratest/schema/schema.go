@@ -51,9 +51,9 @@ type Table struct {
 
 	// Главный ключ таблицы (может быть nil)
 	PrimaryKey *Constraint
-	// Внешние ключи таблицы, ключ мапы - FK NAME
+	// Внешние ключи таблицы, ключ мапы - FK
 	ForeignKeys map[string]ForeignKey
-	// Ключи, которые ссылаются на эту таблицу, ключ мапы - FK NAME
+	// Ключи, которые ссылаются на эту таблицу, ключ мапы - UNIQUE CONSTRAINT
 	ReferencedBy map[string]*Constraint
 
 	// Список всех CONSTRAINT-ов текущей таблицы
@@ -63,8 +63,8 @@ type Table struct {
 // ForeignKey описывает внешнюю связь
 type ForeignKey struct {
 	// CONSTRAINT в текущей таблице
-	// Local.Type IN (PK, UNIQUE)
-	Local *Constraint
+	// Uniq.Type IN (PK, UNIQUE)
+	Uniq *Constraint
 
 	// В PostgreSQL FK может ссылаться на PK или UNIQUE индекс
 	// CONSTRAINT во внешней таблице
@@ -135,7 +135,7 @@ type Constraint struct {
 	// Имя ограничения
 	Name Identifier
 	// Таблица, которой принадлежит ограничение
-	Table Identifier
+	Table *Table
 	// Тип ограничения
 	Type ConstraintType
 	// Колонки, на которые действует ограничение
@@ -143,7 +143,7 @@ type Constraint struct {
 	// Количество колонок всегда >= 1
 	// Для PRIMARY KEY колонка всегда одна
 	// Ключ мапы - имя колонки
-	TableColumns map[string]*Column
+	Columns map[string]*Column
 }
 
 var pgConstraintType = map[string]ConstraintType{
