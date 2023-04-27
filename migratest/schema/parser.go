@@ -44,6 +44,9 @@ func (p *Parser) LoadSchema(ctx context.Context, schemas []string) (*Schema, err
 	if err := p.LoadConstraintsColumns(ctx, &s); err != nil {
 		return nil, err
 	}
+	if err := p.LoadForeignConstraints(ctx, &s); err != nil {
+		return nil, err
+	}
 	return &s, nil
 }
 
@@ -271,8 +274,8 @@ func (p *Parser) LoadConstraintsColumns(ctx context.Context, s *Schema) error {
 
 func (p *Parser) LoadForeignConstraints(ctx context.Context, s *Schema) error {
 	type foreignConstraint struct {
-		foreign Identifier
-		unique  Identifier
+		Foreign Identifier
+		Unique  Identifier
 	}
 
 	q := NewQuery[foreignConstraint](`
@@ -288,17 +291,17 @@ func (p *Parser) LoadForeignConstraints(ctx context.Context, s *Schema) error {
 		FROM
 			information_schema.referential_constraints
 		WHERE
-			AND constraint_schema || '.' || constraint_name = ANY($1)`,
+			constraint_schema || '.' || constraint_name = ANY($1)`,
 		s.ConstraintNames,
 	)
 
 	foreignKeys, err := q.All(ctx, p.db.Conn,
 		func(rows pgx.Rows, fc *foreignConstraint) error {
 			return rows.Scan(
-				&fc.foreign.Schema,
-				&fc.foreign.Name,
-				&fc.unique.Schema,
-				&fc.unique.Name,
+				&fc.Foreign.Schema,
+				&fc.Foreign.Name,
+				&fc.Unique.Schema,
+				&fc.Unique.Name,
 				nil,
 				nil,
 				nil,
@@ -307,27 +310,27 @@ func (p *Parser) LoadForeignConstraints(ctx context.Context, s *Schema) error {
 	if err != nil {
 		return err
 	}
-	p.log.Debug("", zap.Reflect("fk", foreignKeys))
+	p.log.Info("", zap.Reflect("fk", foreignKeys))
 
 	for _, keys := range foreignKeys {
-		fk, ok := s.Constraints[keys.foreign.String()]
+		fk, ok := s.Constraints[keys.Foreign.String()]
 		if !ok {
-			return fmt.Errorf("constraint %q not found", keys.foreign)
+			return fmt.Errorf("constraint %q not found", keys.Foreign)
 		}
 
-		uniq, ok := s.Constraints[keys.unique.String()]
+		uniq, ok := s.Constraints[keys.Unique.String()]
 		if !ok {
-			return fmt.Errorf("constraint %q not found", keys.foreign)
+			return fmt.Errorf("constraint %q not found", keys.Foreign)
 		}
 
 		// FIXME
 		// таблица, в которой есть FK
-		uniq.Table.ForeignKeys[fk.Name.String()] = ForeignKey{
+		fk.Table.ForeignKeys[fk.Name.String()] = ForeignKey{
 			Uniq:    uniq,
 			Foreign: fk,
 		}
 		// таблица, на которую ссылаются
-		fk.Table.ReferencedBy[uniq.Name.String()] = uniq
+		uniq.Table.ReferencedBy[uniq.Name.String()] = uniq
 	}
 
 	return nil
