@@ -1,10 +1,10 @@
 -- Создание DOMAIN
-CREATE DOMAIN custom_domain AS VARCHAR(100);
+CREATE DOMAIN name_domain AS VARCHAR(100);
 
 -- Создание COMPOSITE типа
 CREATE TYPE custom_type AS (
-  first_name VARCHAR(50),
-  last_name VARCHAR(50)
+  first_name name_domain,
+  last_name name_domain
 );
 
 -- Создание ENUM
@@ -26,8 +26,8 @@ CREATE TABLE roles (
 
 -- Создание таблицы с PRIMARY KEY, UNIQUE, CHECK, FOREIGN KEY ограничениями
 CREATE TABLE users (
-  id INTEGER PRIMARY KEY,
-  name VARCHAR(50) NOT NULL,
+  id SERIAL PRIMARY KEY,
+  name name_domain NOT NULL,
   email VARCHAR(100) UNIQUE NOT NULL,
   age INTEGER CHECK (age > 0),
   full_name custom_type,
@@ -60,11 +60,11 @@ CREATE TABLE products (
 CREATE TABLE orders (
   id INTEGER PRIMARY KEY,
   user_id INTEGER REFERENCES users(id),
-  product_id INTEGER REFERENCES products(id),
+  product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
   quantity INTEGER NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
-  -- Добавление UNIQUE индекса для нескольких колонок, некоторые из которых имеют модификатор NOT NULL
-  CONSTRAINT orders_user_product_unique UNIQUE (user_id, product_id)
+  -- Добавление UNIQUE индекса для нескольких колонок
+  CONSTRAINT orders_user_product_unique UNIQUE NULLS NOT DISTINCT (user_id, product_id)
 );
 
 -- Добавление обычного индекса

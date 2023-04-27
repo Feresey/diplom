@@ -41,7 +41,7 @@ func QueryOne[T any](
 	ctx context.Context,
 	exec Executor,
 	sb SQLizer,
-	scan func(Scanner, *T) error,
+	dest ...any,
 ) (result T, err error) {
 	query, args, err := sb.ToSql()
 	if err != nil {
@@ -52,7 +52,7 @@ func QueryOne[T any](
 	}
 
 	row := exec.QueryRow(ctx, query, args...)
-	if err := scan(row, &result); err != nil {
+	if err := row.Scan(dest...); err != nil {
 		return result, Error{
 			Err:   err,
 			State: "scan results",
@@ -67,7 +67,7 @@ func QueryAll[T any](
 	ctx context.Context,
 	exec Executor,
 	sb SQLizer,
-	scan func(Scanner, *T) error,
+	scan func(pgx.Rows, *T) error,
 ) (results []T, err error) {
 	query, args, err := sb.ToSql()
 	if err != nil {

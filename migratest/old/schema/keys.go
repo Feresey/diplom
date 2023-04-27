@@ -8,8 +8,9 @@ type PrimaryKey struct {
 
 // ForeignKey represents a foreign key constraint in a database
 type ForeignKey struct {
-	Table    string `json:"table"`
 	Name     string `json:"name"`
+
+	Table    string `json:"table"`
 	Column   string `json:"column"`
 	Nullable bool   `json:"nullable"`
 	Unique   bool   `json:"unique"`
