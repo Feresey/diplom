@@ -101,6 +101,7 @@ func (q Querier[T]) All(
 		if err := scan(rows, &row); err != nil {
 			return nil, q.Error("scan", err)
 		}
+		results = append(results, row)
 	}
 	return results, nil
 }

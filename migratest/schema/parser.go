@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"go.uber.org/zap"
 )
 
 type ParserConfig struct {
@@ -12,38 +13,41 @@ type ParserConfig struct {
 }
 
 type Parser struct {
-	db *DBConn
-
-	schema Schema
+	db  *DBConn
+	log *zap.Logger
 }
 
-func NewParser(db *DBConn) *Parser {
+func NewParser(
+	db *DBConn,
+	log *zap.Logger,
+) *Parser {
 	return &Parser{
-		db: db,
+		log: log.Named("parser"),
+		db:  db,
 	}
 }
 
 func (p *Parser) LoadSchema(ctx context.Context, schemas []string) (*Schema, error) {
 	var s Schema
 
-	if err := s.LoadTables(ctx, p.db, schemas); err != nil {
+	if err := p.LoadTables(ctx, &s, schemas); err != nil {
 		return nil, err
 	}
 	s.setTableNames()
-	if err := s.LoadTablesColumns(ctx, p.db); err != nil {
+	if err := p.LoadTablesColumns(ctx, &s); err != nil {
 		return nil, err
 	}
-	if err := s.LoadConstraints(ctx, p.db); err != nil {
+	if err := p.LoadConstraints(ctx, &s); err != nil {
 		return nil, err
 	}
 	s.setConstraintsNames()
-	if err := s.LoadConstraintsColumns(ctx, p.db); err != nil {
+	if err := p.LoadConstraintsColumns(ctx, &s); err != nil {
 		return nil, err
 	}
 	return &s, nil
 }
 
-func (s *Schema) LoadTables(ctx context.Context, db *DBConn, schemas []string) error {
+func (p *Parser) LoadTables(ctx context.Context, s *Schema, schemas []string) error {
 	q := NewQuery[Table](`
 		-- list tables
 		SELECT
@@ -54,14 +58,14 @@ func (s *Schema) LoadTables(ctx context.Context, db *DBConn, schemas []string) e
 		WHERE
 			schemaname = ANY($1)`, schemas)
 
-	tables, err := q.AllRet(ctx, db.Conn, func(s pgx.Rows) (Table, error) {
+	tables, err := q.AllRet(ctx, p.db.Conn, func(rows pgx.Rows) (Table, error) {
 		t := Table{
 			Columns:      make(map[string]*Column),
 			ForeignKeys:  make(map[string]ForeignKey),
 			ReferencedBy: make(map[string]*Constraint),
 			Constraints:  make(map[string]*Constraint),
 		}
-		return t, s.Scan(&t.Name.Schema, &t.Name.Name)
+		return t, rows.Scan(&t.Name.Schema, &t.Name.Name)
 	})
 	if err != nil {
 		return err
@@ -75,7 +79,7 @@ func (s *Schema) LoadTables(ctx context.Context, db *DBConn, schemas []string) e
 	return nil
 }
 
-func (s *Schema) LoadTablesColumns(ctx context.Context, db *DBConn) error {
+func (p *Parser) LoadTablesColumns(ctx context.Context, s *Schema) error {
 	type tableColumn struct {
 		Table Identifier
 		Column
@@ -102,9 +106,9 @@ func (s *Schema) LoadTablesColumns(ctx context.Context, db *DBConn) error {
 			table_schema || '.' || table_name = ANY($1)`,
 		s.TableNames)
 
-	columns, err := q.All(ctx, db.Conn,
-		func(s pgx.Rows, c *tableColumn) error {
-			return s.Scan(
+	columns, err := q.All(ctx, p.db.Conn,
+		func(rows pgx.Rows, c *tableColumn) error {
+			return rows.Scan(
 				&c.Table.Name,
 				&c.Table.Schema,
 
@@ -124,19 +128,22 @@ func (s *Schema) LoadTablesColumns(ctx context.Context, db *DBConn) error {
 	if err != nil {
 		return err
 	}
+	p.log.Debug("", zap.Reflect("columns", columns))
 
 	for idx, column := range columns {
 		table, ok := s.Tables[column.Table.String()]
 		if !ok {
 			return fmt.Errorf("table %q not found", column.Table)
 		}
-		table.Columns[column.Name] = &columns[idx].Column
+		col := &columns[idx].Column
+		col.Table = table
+		table.Columns[column.Name] = col
 	}
 
 	return nil
 }
 
-func (s *Schema) LoadConstraints(ctx context.Context, db *DBConn) error {
+func (p *Parser) LoadConstraints(ctx context.Context, s *Schema) error {
 	type constraint struct {
 		table          Identifier
 		constraint     string
@@ -158,9 +165,9 @@ func (s *Schema) LoadConstraints(ctx context.Context, db *DBConn) error {
 		s.TableNames,
 	)
 
-	constraints, err := q.All(ctx, db.Conn,
-		func(s pgx.Rows, c *constraint) error {
-			return s.Scan(
+	constraints, err := q.All(ctx, p.db.Conn,
+		func(rows pgx.Rows, c *constraint) error {
+			return rows.Scan(
 				&c.table.Schema,
 				&c.table.Name,
 				&c.constraint,
@@ -170,6 +177,7 @@ func (s *Schema) LoadConstraints(ctx context.Context, db *DBConn) error {
 	if err != nil {
 		return err
 	}
+	p.log.Debug("", zap.Reflect("constraints", constraints))
 
 	s.Constraints = make(map[string]*Constraint, len(constraints))
 	for _, constraint := range constraints {
@@ -205,7 +213,7 @@ func (s *Schema) LoadConstraints(ctx context.Context, db *DBConn) error {
 	return nil
 }
 
-func (s *Schema) LoadConstraintsColumns(ctx context.Context, db *DBConn) error {
+func (p *Parser) LoadConstraintsColumns(ctx context.Context, s *Schema) error {
 	type constraintColumn struct {
 		table      string
 		column     string
@@ -224,9 +232,9 @@ func (s *Schema) LoadConstraintsColumns(ctx context.Context, db *DBConn) error {
 			AND constraint_name = ANY($2)`,
 		s.TableNames, s.ConstraintNames)
 
-	constraintsColumns, err := q.All(ctx, db.Conn,
-		func(s pgx.Rows, c *constraintColumn) error {
-			return s.Scan(
+	constraintsColumns, err := q.All(ctx, p.db.Conn,
+		func(rows pgx.Rows, c *constraintColumn) error {
+			return rows.Scan(
 				&c.table,
 				&c.column,
 				&c.constraint,
@@ -235,6 +243,7 @@ func (s *Schema) LoadConstraintsColumns(ctx context.Context, db *DBConn) error {
 	if err != nil {
 		return err
 	}
+	p.log.Debug("", zap.Reflect("constraints_columns", constraintsColumns))
 
 	for _, constraintColumn := range constraintsColumns {
 		constraint, ok := s.Constraints[constraintColumn.constraint]
@@ -260,7 +269,7 @@ func (s *Schema) LoadConstraintsColumns(ctx context.Context, db *DBConn) error {
 	return nil
 }
 
-func (s *Schema) LoadForeignConstraints(ctx context.Context, db *DBConn) error {
+func (p *Parser) LoadForeignConstraints(ctx context.Context, s *Schema) error {
 	type foreignConstraint struct {
 		foreign Identifier
 		unique  Identifier
@@ -283,9 +292,9 @@ func (s *Schema) LoadForeignConstraints(ctx context.Context, db *DBConn) error {
 		s.ConstraintNames,
 	)
 
-	foreignKeys, err := q.All(ctx, db.Conn,
-		func(s pgx.Rows, fc *foreignConstraint) error {
-			return s.Scan(
+	foreignKeys, err := q.All(ctx, p.db.Conn,
+		func(rows pgx.Rows, fc *foreignConstraint) error {
+			return rows.Scan(
 				&fc.foreign.Schema,
 				&fc.foreign.Name,
 				&fc.unique.Schema,
@@ -298,6 +307,7 @@ func (s *Schema) LoadForeignConstraints(ctx context.Context, db *DBConn) error {
 	if err != nil {
 		return err
 	}
+	p.log.Debug("", zap.Reflect("fk", foreignKeys))
 
 	for _, keys := range foreignKeys {
 		fk, ok := s.Constraints[keys.foreign.String()]

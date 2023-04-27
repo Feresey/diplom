@@ -17,6 +17,8 @@ import (
 func newLogger() *zap.Logger {
 	lc := zap.NewDevelopmentConfig()
 	lc.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	lc.DisableStacktrace = true
+	lc.Level.SetLevel(zap.InfoLevel)
 	log, err := lc.Build()
 	if err != nil {
 		println("failed to build zap logger: ", err)
@@ -32,6 +34,16 @@ func newConfig() config.Config {
 	}
 }
 
+type ErrorHandler struct {
+	log *zap.Logger
+}
+
+func (e ErrorHandler) HandleError(err error) {
+	e.log.Error(err.Error())
+	// vis, verr := fx.VisualizeError(err)
+	// e.log.Info(vis, zap.Error(verr))
+}
+
 func main() {
 	log := newLogger()
 	config := newConfig()
@@ -45,7 +57,7 @@ func main() {
 		),
 		fx.WithLogger(func(logger *zap.Logger) fxevent.Logger {
 			l := &fxevent.ZapLogger{Logger: logger}
-			l.UseErrorLevel(zap.ErrorLevel)
+			l.UseErrorLevel(zap.DebugLevel)
 			l.UseLogLevel(zap.DebugLevel)
 			return l
 		}),
@@ -58,13 +70,14 @@ func main() {
 		fx.Populate(
 			&parser,
 		),
-		fx.Invoke(func(sh fx.Shutdowner, p *schema.Parser) {
+		fx.ErrorHook(ErrorHandler{
+			log: log,
 		}),
 	)
 
 	err := app.Start(context.Background())
 	if err != nil {
-		log.Fatal("start app", zap.Error(err))
+		log.Fatal("failed to start app")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -82,8 +95,9 @@ func main() {
 		}
 	}
 
-	s.Dump(os.Stdout)
-
+	if err := s.Dump(os.Stdout); err != nil {
+		log.Error("dump failed", zap.Error(err))
+	}
 
 	err = app.Stop(context.Background())
 	if err != nil {

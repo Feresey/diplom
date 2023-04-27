@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"bytes"
 	"embed"
 	_ "embed"
 	"fmt"
@@ -196,15 +197,16 @@ func (s *Schema) Dump(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	tpl.ExecuteTemplate(w, "dump.tpl", s)
 
-	// offset := "  "
-	// for _, name := range s.TableNames {
-	// 	table := s.Tables[name]
-	// 	table.Dump(w, offset)
-	// }
+	var buf bytes.Buffer
 
-	return nil
+	err = tpl.ExecuteTemplate(&buf, "dump.tpl", s)
+	if err != nil {
+		return err
+	}
+
+	_, err = buf.WriteTo(w)
+	return err
 }
 
 // func (t *Table) Dump(w io.Writer, offset string) error {
