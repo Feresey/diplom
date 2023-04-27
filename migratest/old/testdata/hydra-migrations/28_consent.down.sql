@@ -1,1 +1,0 @@
-ALTER TABLE hydra_oauth2_authentication_session DROP COLUMN remember;

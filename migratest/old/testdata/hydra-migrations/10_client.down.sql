@@ -1,1 +1,0 @@
-ALTER TABLE hydra_client ALTER COLUMN audience DROP NOT NULL;

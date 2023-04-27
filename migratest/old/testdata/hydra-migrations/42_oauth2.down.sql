@@ -1,1 +1,0 @@
-DROP TABLE hydra_oauth2_jti_blacklist;
