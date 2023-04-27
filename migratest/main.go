@@ -73,7 +73,7 @@ func main() {
 		cancel()
 	}()
 
-	err = parser.LoadSchema(ctx, []string{"test"})
+	s, err := parser.LoadSchema(ctx, []string{"test"})
 	if err != nil {
 		log.Error("load schema", zap.Error(err))
 		var qErr schema.Error
@@ -81,6 +81,9 @@ func main() {
 			log.Sugar().Errorf("error:\n%s", qErr.Pretty())
 		}
 	}
+
+	s.Dump(os.Stdout)
+
 
 	err = app.Stop(context.Background())
 	if err != nil {

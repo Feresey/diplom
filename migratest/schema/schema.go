@@ -1,8 +1,15 @@
 package schema
 
 import (
+	"embed"
+	_ "embed"
 	"fmt"
+	"io"
+	"sort"
+	"strings"
+	"text/template"
 
+	"github.com/Masterminds/sprig/v3"
 	"github.com/volatiletech/null/v8"
 )
 
@@ -32,6 +39,7 @@ func (s *Schema) setConstraintsNames() {
 	for key := range s.Constraints {
 		names = append(names, key)
 	}
+	sort.Strings(names)
 	s.ConstraintNames = names
 }
 
@@ -41,6 +49,7 @@ func (s *Schema) setTableNames() {
 	for key := range s.Tables {
 		names = append(names, key)
 	}
+	sort.Strings(names)
 	s.TableNames = names
 }
 
@@ -119,7 +128,7 @@ type ColumnAttributes struct {
 
 // TODO
 //
-//go:generate ${TOOLS}/enumer -type ConstraintType -trimprefix ConstraintType
+//go:generate enumer -type ConstraintType -trimprefix ConstraintType
 type ConstraintType int
 
 const (
@@ -166,3 +175,88 @@ func (c *Constraint) SetType(constraintType string) error {
 	c.Type = typ
 	return nil
 }
+
+//go:embed dump.tpl
+var dumptpl embed.FS
+
+func (s *Schema) Dump(w io.Writer) error {
+	t := template.New("").
+		Funcs(sprig.TxtFuncMap()).
+		Funcs(template.FuncMap{
+			"columnNames": func(cols map[string]*Column) string {
+				names := make([]string, 0, len(cols))
+				for name := range cols {
+					names = append(names, name)
+				}
+				sort.Strings(names)
+				return strings.Join(names, ", ")
+			},
+		})
+	tpl, err := t.ParseFS(dumptpl, "*.tpl")
+	if err != nil {
+		return err
+	}
+	tpl.ExecuteTemplate(w, "dump.tpl", s)
+
+	// offset := "  "
+	// for _, name := range s.TableNames {
+	// 	table := s.Tables[name]
+	// 	table.Dump(w, offset)
+	// }
+
+	return nil
+}
+
+// func (t *Table) Dump(w io.Writer, offset string) error {
+// 	var sb strings.Builder
+
+// 	sb.WriteString("TABLE ")
+// 	sb.WriteString(t.Name.String())
+// 	sb.WriteString("(\n")
+
+// 	sb.WriteString(offset)
+// 	sb.WriteString("PRIMARY KEY ")
+// 	if pk := t.PrimaryKey; pk == nil {
+// 		sb.WriteString("IS NOT FOUND")
+// 	} else {
+// 		sb.WriteString(pk.Name.String())
+// 		sb.WriteString(" (")
+// 		sb.WriteString(dumpKeysSorted(pk.Columns, ", "))
+// 		sb.WriteString(")")
+// 	}
+
+// 	sb.WriteString("\n")
+// 	sb.WriteString(offset)
+// 	sb.WriteString("FOREIGN KEYS")
+// 	if fks := t.ForeignKeys; len(fks) == 0 {
+// 		sb.WriteString("IS NOT FOUND")
+// 	} else {
+// 		for _, fk := range fks {
+// 			// fk.
+// 		}
+// 	}
+// }
+
+// func (t *Table) DumpPK() string {
+// 	var sb strings.Builder
+// 	sb.WriteString("PRIMARY KEY ")
+// 	if pk := t.PrimaryKey; pk == nil {
+// 		sb.WriteString("IS NOT FOUND")
+// 	} else {
+// 		sb.WriteString(pk.Name.String())
+// 		sb.WriteString(" (")
+// 		sb.WriteString(dumpKeysSorted(pk.Columns, ", "))
+// 		sb.WriteString(")")
+// 	}
+
+// 	return sb.String()
+// }
+
+// func dumpKeysSorted[T any](m map[string]T, delim string) string {
+// 	keys := make([]string, 0, len(m))
+// 	for key := range m {
+// 		keys = append(keys, key)
+// 	}
+// 	sort.Strings(keys)
+// 	return strings.Join(keys, delim)
+// }
