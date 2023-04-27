@@ -1,7 +1,11 @@
 package config
 
+import "go.uber.org/fx"
+
 type DBConfig string
 
 type Config struct {
-	DBConfig DBConfig `yaml:"db"`
+	fx.Out
+
+	DBConn DBConfig `yaml:"db"`
 }

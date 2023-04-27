@@ -12,12 +12,12 @@ type ParserConfig struct {
 }
 
 type Parser struct {
-	db DBConn
+	db *DBConn
 
-	schema *Schema
+	schema Schema
 }
 
-func NewParser(db DBConn) *Parser {
+func NewParser(db *DBConn) *Parser {
 	return &Parser{
 		db: db,
 	}
@@ -43,6 +43,7 @@ func (p *Parser) LoadSchema(ctx context.Context, schemas []string) error {
 
 func (p *Parser) LoadTables(ctx context.Context, schemas []string) error {
 	q := NewQuery[Table](`
+		-- list tables
 		SELECT
 			schemaname,
 			tablename
@@ -78,6 +79,7 @@ func (p *Parser) LoadTablesColumns(ctx context.Context) error {
 		Column
 	}
 	q := NewQuery[tableColumn](`
+		-- tables columns
 		SELECT
 			table_name,
 			table_schema,
@@ -95,7 +97,7 @@ func (p *Parser) LoadTablesColumns(ctx context.Context) error {
 		FROM
 			information_schema.columns
 		WHERE
-			'"' || nr.nspname || '"."' || r.relname || '"' = ANY($1)`,
+			table_schema || '.' || table_name = ANY($1)`,
 		p.schema.TableNames)
 
 	columns, err := q.All(ctx, p.db.Conn,
@@ -139,17 +141,18 @@ func (p *Parser) LoadConstraints(ctx context.Context) error {
 		constraintType string
 	}
 	q := NewQuery[constraint](`
+		-- tables constraints
 		SELECT
-			nr.nspname AS table_schema,
-			r.relname AS table_name,
-			c.conname AS constraint_name,
-			c.contype AS constraint_type
+			nr.nspname::TEXT AS table_schema,
+			r.relname::TEXT AS table_name,
+			c.conname::TEXT AS constraint_name,
+			c.contype::TEXT AS constraint_type
 		FROM
 			pg_constraint c
 			JOIN pg_class r ON c.conrelid = r.oid
 			JOIN pg_namespace nr ON nr.oid = r.relnamespace AND c.conrelid = r.oid
 		WHERE
-			'"' || nr.nspname || '"."' || r.relname || '"' = ANY($1)`,
+			nr.nspname || '.' || r.relname = ANY($1)`,
 		p.schema.TableNames,
 	)
 
@@ -207,15 +210,16 @@ func (p *Parser) LoadConstraintsColumns(ctx context.Context) error {
 		constraint string
 	}
 	q := NewQuery[constraintColumn](`
-			SELECT
-				table_name,
-				column_name,
-				constraint_name
-			FROM
-				information_schema.constraint_column_usage
-			WHERE
-				'"' || table_schema || '"."' || table_name || '"' = ANY($1)
-				AND constraint_name = ANY($2)`,
+		-- constraints columns
+		SELECT
+			table_name,
+			column_name,
+			constraint_name
+		FROM
+			information_schema.constraint_column_usage
+		WHERE
+			table_schema || '.' || table_name = ANY($1)
+			AND constraint_name = ANY($2)`,
 		p.schema.TableNames, p.schema.ConstraintNames)
 
 	constraintsColumns, err := q.All(ctx, p.db.Conn,
@@ -261,6 +265,7 @@ func (p *Parser) LoadForeignConstraints(ctx context.Context) error {
 	}
 
 	q := NewQuery[foreignConstraint](`
+		-- foreign keys
 		SELECT
 			constraint_schema,
 			constraint_name,
@@ -272,7 +277,7 @@ func (p *Parser) LoadForeignConstraints(ctx context.Context) error {
 		FROM
 			information_schema.referential_constraints
 		WHERE
-			AND '"' || constraint_schema || '"."' || constraint_name || '"' = ANY($1)`,
+			AND constraint_schema || '.' || constraint_name = ANY($1)`,
 		p.schema.ConstraintNames,
 	)
 

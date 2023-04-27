@@ -2,6 +2,8 @@ package schema
 
 import (
 	"fmt"
+
+	"github.com/volatiletech/null/v8"
 )
 
 type Identifier struct {
@@ -9,7 +11,7 @@ type Identifier struct {
 	Name   string
 }
 
-func (i Identifier) String() string { return fmt.Sprintf(`"%s"."%s"`, i.Schema, i.Name) }
+func (i Identifier) String() string { return fmt.Sprintf(`%s.%s`, i.Schema, i.Name) }
 
 // Schema отражает схему, расположенную в базе данных
 type Schema struct {
@@ -91,28 +93,28 @@ type DBType struct {
 	IsUserType bool
 
 	// Underlying type
-	UDTSchema string
-	UDT       string
+	UDTSchema null.String
+	UDT       null.String
 
 	Enum  string
 	Range string
 
-	DomainSchema string
-	Domain       string
+	DomainSchema null.String
+	Domain       null.String
 
-	CharMaxLength int
+	CharMaxLength null.Int
 }
 
 // ColumnAttributes описывает аттрибуты колонки
 type ColumnAttributes struct {
 	// Дефолтное значение (если указано), так же может быть SQL выражением
-	Default string
+	Default null.String
 	// Допустимы ли NULL значения колонки
 	Nullable bool
 	// Генерируемое значение колонки (может быть задано явно)
 	ISGenerated bool
 	// Условие генерации
-	Generated string
+	Generated null.String
 }
 
 // TODO

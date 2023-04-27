@@ -27,10 +27,11 @@ type Error struct {
 }
 
 func (e Error) Error() string {
-	if e.Query == "" {
-		return fmt.Sprintf("%s: %v", e.Message, e.Err)
-	}
-	return fmt.Sprintf("%s: %v: query: `%s` args: %+#v", e.Message, e.Err, e.Query, e.Args)
+	return fmt.Sprintf("%s: %v", e.Message, e.Err)
+}
+
+func (e Error) Pretty() string {
+	return fmt.Sprintf("%s: %v:\nquery:\n%s\n\n===\nargs: %+#v", e.Message, e.Err, e.Query, e.Args)
 }
 
 // type Scanner interface {
@@ -75,7 +76,7 @@ func NewQuery[T any](query string, args ...any) *Querier[T] {
 	}
 }
 
-func (q *Querier[T]) Error(msg string, err error) error {
+func (q Querier[T]) Error(msg string, err error) error {
 	return Error{
 		Message: msg,
 		Err:     err,
@@ -84,7 +85,7 @@ func (q *Querier[T]) Error(msg string, err error) error {
 	}
 }
 
-func (q *Querier[T]) All(
+func (q Querier[T]) All(
 	ctx context.Context,
 	exec Executor,
 	scan func(pgx.Rows, *T) error,
@@ -104,7 +105,7 @@ func (q *Querier[T]) All(
 	return results, nil
 }
 
-func (q *Querier[T]) AllRet(
+func (q Querier[T]) AllRet(
 	ctx context.Context,
 	exec Executor,
 	scan func(pgx.Rows) (T, error),

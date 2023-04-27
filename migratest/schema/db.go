@@ -13,12 +13,12 @@ type DBConn struct {
 	*pgx.Conn
 }
 
-func NewDB(lc fx.Lifecycle, cfg config.DBConfig) (DBConn, error) {
+func NewDB(lc fx.Lifecycle, cfg config.DBConfig) (*DBConn, error) {
 	var conn DBConn
 
 	cnf, err := pgx.ParseConfig(string(cfg))
 	if err != nil {
-		return conn, err
+		return nil, err
 	}
 
 	lc.Append(fx.StartStopHook(
@@ -32,5 +32,5 @@ func NewDB(lc fx.Lifecycle, cfg config.DBConfig) (DBConn, error) {
 		},
 	))
 
-	return conn, nil
+	return &conn, nil
 }
