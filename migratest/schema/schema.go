@@ -115,6 +115,16 @@ type DBType struct {
 	CharMaxLength null.Int
 }
 
+func (t DBType) String() string {
+	if t.IsUserType {
+		return fmt.Sprintf("%s.%s", t.UDTSchema.String, t.UDT.String)
+	}
+	if t.Domain.Valid {
+		return fmt.Sprintf("%s.%s", t.DomainSchema.String, t.Domain.String)
+	}
+	return t.Type
+}
+
 // ColumnAttributes описывает аттрибуты колонки
 type ColumnAttributes struct {
 	// Дефолтное значение (если указано), так же может быть SQL выражением
@@ -125,6 +135,39 @@ type ColumnAttributes struct {
 	ISGenerated bool
 	// Условие генерации
 	Generated null.String
+}
+
+func (ca ColumnAttributes) String() string {
+	var sb strings.Builder
+	var needSpace bool
+	space := func() {
+		if needSpace {
+			sb.WriteByte(' ')
+			needSpace = false
+		} else {
+			needSpace = true
+		}
+	}
+
+	if !ca.Nullable {
+		space()
+		sb.WriteString("NOT NULL")
+	}
+
+	if ca.Default.Valid {
+		space()
+		sb.WriteString("DEFAULT ")
+		sb.WriteString(ca.Default.String)
+	}
+
+	if ca.ISGenerated {
+		space()
+		sb.WriteString("GENERATED ALWAYS AS ")
+		sb.WriteString(ca.Generated.String)
+		sb.WriteString(" STORED")
+	}
+
+	return sb.String()
 }
 
 // TODO
@@ -191,6 +234,9 @@ func (s *Schema) Dump(w io.Writer) error {
 				}
 				sort.Strings(names)
 				return strings.Join(names, ", ")
+			},
+			"space": func(namelen int, maxlen int) string {
+				return strings.Repeat(" ", maxlen-namelen)
 			},
 		})
 	tpl, err := t.ParseFS(dumptpl, "*.tpl")

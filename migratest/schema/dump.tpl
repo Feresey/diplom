@@ -1,38 +1,20 @@
 {{- range .TableNames }}
 {{- with index $.Tables .}}
-TABLE {{.Name.String}} (
-    PK: {{with .PrimaryKey -}}{{.Name.String}} ({{.Columns | columnNames}}){{else}}NOT FOUND{{end}}
-    FK: {{if eq (len .ForeignKeys) 0 }}NOT FOUND{{else}}
-    {{- range $fkName, $fk := .ForeignKeys }}
-      {{ $fkName }}:
-        Table: {{ $fk.Uniq.Name.Schema }}.{{ $fk.Uniq.Name.Name }}
-        Columns: {{ $fk.Uniq.Columns | columnNames }}
+TABLE {{.Name}} (
+    PRIMARY KEY {{with .PrimaryKey -}}{{.Name}} ({{.Columns | columnNames}}){{else}}NOT FOUND{{end}}
+    {{- range .ForeignKeys }}
+    FOREIGN KEY {{.Foreign.Name}} {{.Uniq.Name}}({{.Uniq.Columns | columnNames}})
     {{- end }}
+    {{- $maxlen := 0 }}
+    {{- range .Columns }}
+    {{- if gt (len .Name) $maxlen }}
+    {{- $maxlen = len .Name }}
+    {{- end}}
     {{- end }}
-    Referenced By:
-    {{- range $refName, $ref := .ReferencedBy }}
-      {{ $refName }}:
-        Table: {{ $ref.Table.Name.Schema }}.{{ $ref.Table.Name.Name }}
-        Columns: {{ $ref.Columns | columnNames }}
+    {{- range .Columns }}
+    {{/* TODO constraint */}}
+    {{.Name}} {{- space (len .Name) $maxlen }} {{.Type}} {{.Attributes}}
     {{- end }}
-    {{- /*
-    Constraints:
-    {{- range $cName, $c := .Constraints }}
-      {{ $cName }}:
-        Type: {{ $c.Type.String }}
-        Columns: {{ $c.Columns | columnNames }}
-    {{- end }}
-    */}}
 )
 {{ end }}
 {{- end }}
-
-{{- /* 
-Constraints:
-{{- range .ConstraintNames }}
-  {{ . }}:
-    Type: {{ index $.Constraints .Type.String }}
-    Table: {{ .Table.Name.Schema }}.{{ .Table.Name.Name }}
-    Columns: {{ .Columns | columnNames }}
-{{end}}
-*/}}
