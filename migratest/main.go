@@ -9,13 +9,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Feresey/mtest/config"
-	"github.com/Feresey/mtest/schema"
-	"github.com/Feresey/mtest/schema/db"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/Feresey/mtest/config"
+	"github.com/Feresey/mtest/schema/db"
+	"github.com/Feresey/mtest/schema/parse"
 )
 
 func newLogger(flags *config.Flags) *zap.Logger {
@@ -73,7 +74,7 @@ func NewApp(populate fx.Option) *fx.App {
 		}),
 		fx.Provide(
 			db.NewDB,
-			schema.NewParser,
+			parse.NewParser,
 		),
 		fx.StartTimeout(5*time.Second),
 		fx.StopTimeout(time.Second),
@@ -87,7 +88,7 @@ func NewApp(populate fx.Option) *fx.App {
 
 func main() {
 	var (
-		parser *schema.Parser
+		parser *parse.Parser
 		log    *zap.Logger
 	)
 
@@ -124,7 +125,7 @@ func main() {
 	}
 }
 
-func launch(ctx context.Context, log *zap.Logger, parser *schema.Parser) error {
+func launch(ctx context.Context, log *zap.Logger, parser *parse.Parser) error {
 	s, err := parser.LoadSchema(ctx, []string{"test"})
 	if err != nil {
 		prettyErr, ok := err.(interface{ Pretty() string })

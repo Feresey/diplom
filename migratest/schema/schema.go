@@ -1,10 +1,6 @@
 package schema
 
-import (
-	_ "embed"
-	"fmt"
-)
-
+// Identifier описывает имя элемента, находящегося в указанной схеме
 type Identifier struct {
 	Schema string
 	Name   string
@@ -15,9 +11,8 @@ func (i Identifier) String() string { return i.Schema + "." + i.Name }
 
 // Schema отражает схему, расположенную в базе данных
 type Schema struct {
-	// TODO UserTypes
+	// TODO загрузка типов
 	Types map[string]*DBType
-
 	// Таблицы
 	Tables map[string]*Table
 	// имена таблиц в том же порядке что и в базе
@@ -110,6 +105,8 @@ type ArrayType struct {
 }
 
 /*
+TODO
+
 	SELECT
 	n.nspname AS schema_name,
 	t.typname AS enum_name,
@@ -172,7 +169,9 @@ type ColumnAttributes struct {
 	Generated string
 }
 
-//go:generate enumer -type ConstraintType -trimprefix ConstraintType
+// TODO upper
+//
+//go:generate enumer -type ConstraintType -trimprefix ConstraintType -transform upper
 type ConstraintType int
 
 const (
@@ -203,23 +202,4 @@ type Constraint struct {
 	// Для PRIMARY KEY колонка всегда одна
 	// Ключ мапы - имя колонки
 	Columns map[string]*Column
-}
-
-var pgConstraintType = map[string]ConstraintType{
-	"p": ConstraintTypePK,
-	"f": ConstraintTypeFK,
-	"c": ConstraintTypeCheck,
-	"u": ConstraintTypeUnique,
-	"t": ConstraintTypeTrigger,
-	"x": ConstraintTypeExclusion,
-}
-
-// SetType устанавливает тип ограничения исходя из значений таблицы pg_constraint
-func (c *Constraint) SetType(constraintType string) error {
-	typ, ok := pgConstraintType[constraintType]
-	if !ok {
-		return fmt.Errorf("unsupported constraint type: %q", constraintType)
-	}
-	c.Type = typ
-	return nil
 }
