@@ -2,23 +2,31 @@ package main
 
 import (
 	"context"
-	"errors"
+	"flag"
+	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/Feresey/mtest/config"
 	"github.com/Feresey/mtest/schema"
+	"github.com/Feresey/mtest/schema/db"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-func newLogger() *zap.Logger {
+func newLogger(flags *config.Flags) *zap.Logger {
 	lc := zap.NewDevelopmentConfig()
 	lc.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	lc.DisableStacktrace = true
-	lc.Level.SetLevel(zap.InfoLevel)
+	if flags.Debug {
+		lc.Level.SetLevel(zap.DebugLevel)
+	} else {
+		lc.Level.SetLevel(zap.InfoLevel)
+	}
 	log, err := lc.Build()
 	if err != nil {
 		println("failed to build zap logger: ", err)
@@ -29,6 +37,7 @@ func newLogger() *zap.Logger {
 }
 
 func newConfig() config.Config {
+	// TODO load from file
 	return config.Config{
 		DBConn: "postgresql://postgres:postgres@localhost:5432",
 	}
@@ -44,16 +53,17 @@ func (e ErrorHandler) HandleError(err error) {
 	// e.log.Info(vis, zap.Error(verr))
 }
 
-func main() {
-	log := newLogger()
+func NewApp(populate fx.Option) *fx.App {
+	flags := config.NewFlags()
+	flag.Parse()
+	log := newLogger(flags)
 	config := newConfig()
 
-	var parser *schema.Parser
-
-	app := fx.New(
+	return fx.New(
 		fx.Supply(
 			log,
 			config,
+			flags,
 		),
 		fx.WithLogger(func(logger *zap.Logger) fxevent.Logger {
 			l := &fxevent.ZapLogger{Logger: logger}
@@ -62,45 +72,74 @@ func main() {
 			return l
 		}),
 		fx.Provide(
-			schema.NewDB,
+			db.NewDB,
 			schema.NewParser,
 		),
 		fx.StartTimeout(5*time.Second),
 		fx.StopTimeout(time.Second),
-		fx.Populate(
-			&parser,
-		),
 		fx.ErrorHook(ErrorHandler{
 			log: log,
 		}),
+
+		populate,
+	)
+}
+
+func main() {
+	var (
+		parser *schema.Parser
+		log    *zap.Logger
 	)
 
-	err := app.Start(context.Background())
-	if err != nil {
-		log.Fatal("failed to start app")
-	}
+	app := NewApp(fx.Populate(&parser, &log))
 
-	ctx, cancel := context.WithCancel(context.Background())
+	runCtx, cancel := context.WithCancel(context.Background())
 	go func() {
 		<-app.Done()
 		cancel()
 	}()
 
+	err := app.Start(runCtx)
+	if err != nil {
+		log.Fatal("failed to start app")
+	}
+	log.Debug("app started")
+
+	defer func() {
+		stopCtx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+
+		err = app.Stop(stopCtx)
+		if err != nil {
+			log.Fatal("stop app", zap.Error(err))
+		}
+		log.Debug("app stopped gracefullty")
+	}()
+
+	// TODO добавить команды (schema, generate, ...)
+	if err := launch(runCtx, log, parser); err != nil {
+		if err != nil {
+			log.Error("launch app", zap.Error(err))
+		}
+	}
+}
+
+func launch(ctx context.Context, log *zap.Logger, parser *schema.Parser) error {
 	s, err := parser.LoadSchema(ctx, []string{"test"})
 	if err != nil {
-		log.Error("load schema", zap.Error(err))
-		var qErr schema.Error
-		if errors.As(err, &qErr) {
-			log.Sugar().Errorf("error:\n%s", qErr.Pretty())
+		prettyErr, ok := err.(interface{ Pretty() string })
+		if ok {
+			log.Error(prettyErr.Pretty())
+			return nil
 		}
+
+		// TODO экзит коды
+		return fmt.Errorf("error loading schema: %w", err)
 	}
 
 	if err := s.Dump(os.Stdout); err != nil {
-		log.Error("dump failed", zap.Error(err))
+		return fmt.Errorf("failed to dump schema: %w", err)
 	}
 
-	err = app.Stop(context.Background())
-	if err != nil {
-		log.Fatal("stop app", zap.Error(err))
-	}
+	return nil
 }

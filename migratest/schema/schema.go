@@ -1,16 +1,10 @@
 package schema
 
 import (
-	"bytes"
-	"embed"
 	_ "embed"
 	"fmt"
-	"io"
-	"sort"
 	"strings"
-	"text/template"
 
-	"github.com/Masterminds/sprig/v3"
 	"github.com/volatiletech/null/v8"
 )
 
@@ -23,43 +17,27 @@ func (i Identifier) String() string { return fmt.Sprintf(`%s.%s`, i.Schema, i.Na
 
 // Schema отражает схему, расположенную в базе данных
 type Schema struct {
+	// TODO UserTypes
+
 	// Таблицы
 	Tables map[string]*Table
+	// имена таблиц в том же порядке что и в базе
+	TableNames []string
 	// Все индексы
 	Constraints map[string]*Constraint
-
-	// имена таблиц
-	TableNames []string
-	// имена индексов
+	// имена индексов в том же порядке что и в базе
 	ConstraintNames []string
-}
-
-// setConstraintsNames устанавливает ConstraintNames на основе поля Constraints
-func (s *Schema) setConstraintsNames() {
-	names := make([]string, 0, len(s.Constraints))
-	for key := range s.Constraints {
-		names = append(names, key)
-	}
-	sort.Strings(names)
-	s.ConstraintNames = names
-}
-
-// setTableNames устанавливает TableNames на основе поля Tables
-func (s *Schema) setTableNames() {
-	names := make([]string, 0, len(s.Tables))
-	for key := range s.Tables {
-		names = append(names, key)
-	}
-	sort.Strings(names)
-	s.TableNames = names
 }
 
 // Table описывает таблицу базы данных
 type Table struct {
 	// имя таблицы
 	Name Identifier
-	// мапа колонок, где ключ - имя колонки
+	// TODO имена в порядке базы
+	// мапа колонок, где ключ - имя колонки хранить имена как
 	Columns map[string]*Column
+	// имена колонок в том же порядке что и в базе
+	ColumnNames []string
 
 	// Главный ключ таблицы (может быть nil)
 	PrimaryKey *Constraint
@@ -106,6 +84,8 @@ type DBType struct {
 	UDTSchema null.String
 	UDT       null.String
 
+	IsArray bool
+
 	Enum  string
 	Range string
 
@@ -118,6 +98,22 @@ type DBType struct {
 func (t DBType) String() string {
 	if t.IsUserType {
 		return fmt.Sprintf("%s.%s", t.UDTSchema.String, t.UDT.String)
+	}
+	if t.IsArray {
+		var arrayNestedCount int
+		arrayElemType := strings.TrimLeftFunc(t.UDT.String, func(r rune) bool {
+			if r == '_' {
+				arrayNestedCount++
+				return true
+			}
+			return false
+		})
+		// TODO get nested type info
+		return fmt.Sprintf("%s.%s%s",
+			t.UDTSchema.String,
+			arrayElemType,
+			strings.Repeat("[]", arrayNestedCount),
+		)
 	}
 	if t.Domain.Valid {
 		return fmt.Sprintf("%s.%s", t.DomainSchema.String, t.Domain.String)
@@ -193,6 +189,10 @@ type Constraint struct {
 	Table *Table
 	// Тип ограничения
 	Type ConstraintType
+	// Только для UNIQUE индекса
+	NullsNotDistinct bool
+	// Результат функции pg_getconstraintdef. Я не уверен что это вообще нужно, но пусть будет.
+	Definition string
 	// Колонки, на которые действует ограничение
 	// Колонки всегда принадлежат той же таблице, которой принадлежит ограничение
 	// Количество колонок всегда >= 1
@@ -219,92 +219,3 @@ func (c *Constraint) SetType(constraintType string) error {
 	c.Type = typ
 	return nil
 }
-
-//go:embed dump.tpl
-var dumptpl embed.FS
-
-func (s *Schema) Dump(w io.Writer) error {
-	t := template.New("").
-		Funcs(sprig.TxtFuncMap()).
-		Funcs(template.FuncMap{
-			"columnNames": func(cols map[string]*Column) string {
-				names := make([]string, 0, len(cols))
-				for name := range cols {
-					names = append(names, name)
-				}
-				sort.Strings(names)
-				return strings.Join(names, ", ")
-			},
-			"space": func(namelen int, maxlen int) string {
-				return strings.Repeat(" ", maxlen-namelen)
-			},
-		})
-	tpl, err := t.ParseFS(dumptpl, "*.tpl")
-	if err != nil {
-		return err
-	}
-
-	var buf bytes.Buffer
-
-	err = tpl.ExecuteTemplate(&buf, "dump.tpl", s)
-	if err != nil {
-		return err
-	}
-
-	_, err = buf.WriteTo(w)
-	return err
-}
-
-// func (t *Table) Dump(w io.Writer, offset string) error {
-// 	var sb strings.Builder
-
-// 	sb.WriteString("TABLE ")
-// 	sb.WriteString(t.Name.String())
-// 	sb.WriteString("(\n")
-
-// 	sb.WriteString(offset)
-// 	sb.WriteString("PRIMARY KEY ")
-// 	if pk := t.PrimaryKey; pk == nil {
-// 		sb.WriteString("IS NOT FOUND")
-// 	} else {
-// 		sb.WriteString(pk.Name.String())
-// 		sb.WriteString(" (")
-// 		sb.WriteString(dumpKeysSorted(pk.Columns, ", "))
-// 		sb.WriteString(")")
-// 	}
-
-// 	sb.WriteString("\n")
-// 	sb.WriteString(offset)
-// 	sb.WriteString("FOREIGN KEYS")
-// 	if fks := t.ForeignKeys; len(fks) == 0 {
-// 		sb.WriteString("IS NOT FOUND")
-// 	} else {
-// 		for _, fk := range fks {
-// 			// fk.
-// 		}
-// 	}
-// }
-
-// func (t *Table) DumpPK() string {
-// 	var sb strings.Builder
-// 	sb.WriteString("PRIMARY KEY ")
-// 	if pk := t.PrimaryKey; pk == nil {
-// 		sb.WriteString("IS NOT FOUND")
-// 	} else {
-// 		sb.WriteString(pk.Name.String())
-// 		sb.WriteString(" (")
-// 		sb.WriteString(dumpKeysSorted(pk.Columns, ", "))
-// 		sb.WriteString(")")
-// 	}
-
-// 	return sb.String()
-// }
-
-// func dumpKeysSorted[T any](m map[string]T, delim string) string {
-// 	keys := make([]string, 0, len(m))
-// 	for key := range m {
-// 		keys = append(keys, key)
-// 	}
-// 	sort.Strings(keys)
-// 	return strings.Join(keys, delim)
-// }

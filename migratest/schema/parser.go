@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Feresey/mtest/schema/db"
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 )
@@ -13,12 +14,12 @@ type ParserConfig struct {
 }
 
 type Parser struct {
-	db  *DBConn
+	db  *db.DBConn
 	log *zap.Logger
 }
 
 func NewParser(
-	db *DBConn,
+	db *db.DBConn,
 	log *zap.Logger,
 ) *Parser {
 	return &Parser{
@@ -27,20 +28,19 @@ func NewParser(
 	}
 }
 
+// TODO вернуть ошибку если есть ссылка на не указанную схему
 func (p *Parser) LoadSchema(ctx context.Context, schemas []string) (*Schema, error) {
 	var s Schema
 
 	if err := p.LoadTables(ctx, &s, schemas); err != nil {
 		return nil, err
 	}
-	s.setTableNames()
 	if err := p.LoadTablesColumns(ctx, &s); err != nil {
 		return nil, err
 	}
 	if err := p.LoadConstraints(ctx, &s); err != nil {
 		return nil, err
 	}
-	s.setConstraintsNames()
 	if err := p.LoadConstraintsColumns(ctx, &s); err != nil {
 		return nil, err
 	}
@@ -50,16 +50,18 @@ func (p *Parser) LoadSchema(ctx context.Context, schemas []string) (*Schema, err
 	return &s, nil
 }
 
+// LoadTables получает имена таблиц, найденных в схемах
 func (p *Parser) LoadTables(ctx context.Context, s *Schema, schemas []string) error {
-	q := NewQuery[Table](`
-		-- list tables
-		SELECT
-			schemaname,
-			tablename
-		FROM
-			pg_tables
-		WHERE
-			schemaname = ANY($1)`, schemas)
+	q := db.NewQuery[Table](`
+-- list tables
+SELECT
+	schemaname,
+	tablename
+FROM
+	pg_tables
+WHERE
+	schemaname = ANY($1)
+`, schemas)
 
 	tables, err := q.AllRet(ctx, p.db.Conn, func(rows pgx.Rows) (Table, error) {
 		t := Table{
@@ -75,38 +77,43 @@ func (p *Parser) LoadTables(ctx context.Context, s *Schema, schemas []string) er
 	}
 
 	s.Tables = make(map[string]*Table, len(tables))
-	for idx := range tables {
-		s.Tables[tables[idx].Name.String()] = &tables[idx]
+	s.TableNames = make([]string, 0, len(tables))
+	for idx, table := range tables {
+		s.Tables[table.Name.String()] = &tables[idx]
+		s.TableNames = append(s.TableNames, table.Name.String())
 	}
 
 	return nil
 }
 
+// LoadTablesColumns загружает колонки таблиц, включая типы и аттрибуты
 func (p *Parser) LoadTablesColumns(ctx context.Context, s *Schema) error {
 	type tableColumn struct {
 		Table Identifier
 		Column
 	}
-	q := NewQuery[tableColumn](`
-		-- tables columns
-		SELECT
-			table_name,
-			table_schema,
-			column_name,
-			data_type,
-			udt_schema,
-			udt_name,
-			character_maximum_length,
-			domain_schema,
-			domain_name,
-			is_nullable = 'YES',
-			column_default,
-			is_generated = 'ALWAYS',
-			generation_expression
-		FROM
-			information_schema.columns
-		WHERE
-			table_schema || '.' || table_name = ANY($1)`,
+	q := db.NewQuery[tableColumn](`
+-- tables columns
+SELECT
+	table_name,
+	table_schema,
+	column_name,
+	data_type,
+	data_type = 'ARRAY' AS is_array,
+	data_type = 'USER-DEFINED' AS is_user_type,
+	udt_schema,
+	udt_name,
+	character_maximum_length,
+	domain_schema,
+	domain_name,
+	is_nullable = 'YES' AS is_nullable,
+	column_default,
+	is_generated = 'ALWAYS' AS is_generated,
+	generation_expression
+FROM
+	information_schema.columns
+WHERE
+	table_schema || '.' || table_name = ANY($1)`,
 		s.TableNames)
 
 	columns, err := q.All(ctx, p.db.Conn,
@@ -117,6 +124,8 @@ func (p *Parser) LoadTablesColumns(ctx context.Context, s *Schema) error {
 
 				&c.Name,
 				&c.Type.Type,
+				&c.Type.IsArray,
+				&c.Type.IsUserType,
 				&c.Type.UDTSchema,
 				&c.Type.UDT,
 				&c.Type.CharMaxLength,
@@ -141,67 +150,82 @@ func (p *Parser) LoadTablesColumns(ctx context.Context, s *Schema) error {
 		col := &columns[idx].Column
 		col.Table = table
 		table.Columns[column.Name] = col
+		table.ColumnNames = append(table.ColumnNames, col.Name)
 	}
 
 	return nil
 }
 
+// LoadConstraints загружает ограничения для всех найденных таблиц
 func (p *Parser) LoadConstraints(ctx context.Context, s *Schema) error {
 	type constraint struct {
-		table          Identifier
-		constraint     string
-		constraintType string
+		Table            Identifier
+		Constraint       Identifier
+		ConstraintType   string
+		NullsNotDistinct bool
+		ConstraintDef    string
 	}
-	q := NewQuery[constraint](`
-		-- tables constraints
-		SELECT
-			nr.nspname::TEXT AS table_schema,
-			r.relname::TEXT AS table_name,
-			c.conname::TEXT AS constraint_name,
-			c.contype::TEXT AS constraint_type
-		FROM
-			pg_constraint c
-			JOIN pg_class r ON c.conrelid = r.oid
-			JOIN pg_namespace nr ON nr.oid = r.relnamespace AND c.conrelid = r.oid
-		WHERE
-			nr.nspname || '.' || r.relname = ANY($1)`,
+	q := db.NewQuery[constraint](`
+-- tables constraints
+SELECT
+	nr.nspname::TEXT AS table_schema,
+	r.relname::TEXT  AS table_name,
+	nr.nspname::TEXT AS constraint_schema,
+	c.conname::TEXT  AS constraint_name,
+	c.contype::TEXT  AS constraint_type,
+	COALESCE(
+		(SELECT NOT pg_index.indnullsnotdistinct
+			FROM pg_index
+			WHERE pg_index.indexrelid = c.conindid
+		), False
+	) AS nulls_not_distinct,
+	pg_get_constraintdef(c.oid) as constraint_def
+FROM
+	pg_constraint c
+	JOIN pg_class r ON c.conrelid = r.oid
+	JOIN pg_namespace nr ON nr.oid = r.relnamespace AND c.conrelid = r.oid
+WHERE
+	nr.nspname || '.' || r.relname = ANY($1)`,
 		s.TableNames,
 	)
 
 	constraints, err := q.All(ctx, p.db.Conn,
 		func(rows pgx.Rows, c *constraint) error {
 			return rows.Scan(
-				&c.table.Schema,
-				&c.table.Name,
-				&c.constraint,
-				&c.constraintType,
+				&c.Table.Schema,
+				&c.Table.Name,
+				&c.Constraint.Schema,
+				&c.Constraint.Name,
+				&c.ConstraintType,
+				&c.NullsNotDistinct,
+				&c.ConstraintDef,
 			)
 		})
 	if err != nil {
 		return err
 	}
-	p.log.Debug("", zap.Reflect("constraints", constraints))
+	p.log.Debug("query constraints", zap.Reflect("constraints", constraints))
 
 	s.Constraints = make(map[string]*Constraint, len(constraints))
 	for _, constraint := range constraints {
-		table, ok := s.Tables[constraint.table.String()]
+		table, ok := s.Tables[constraint.Table.String()]
 		if !ok {
-			return fmt.Errorf("unable to find table %q", constraint.table)
+			return fmt.Errorf("unable to find table %q", constraint.Table)
 		}
 		c := Constraint{
-			Name: Identifier{
-				Schema: constraint.table.Schema,
-				Name:   constraint.constraint,
-			},
-			Table:   table,
-			Columns: make(map[string]*Column),
+			Name:             constraint.Constraint,
+			Table:            table,
+			Columns:          make(map[string]*Column),
+			NullsNotDistinct: constraint.NullsNotDistinct,
+			Definition:       constraint.ConstraintDef,
 		}
-		if err := c.SetType(constraint.constraintType); err != nil {
+		if err := c.SetType(constraint.ConstraintType); err != nil {
 			return err
 		}
 
 		table.Constraints[c.Name.String()] = &c
 		s.Constraints[c.Name.String()] = &c
+		s.ConstraintNames = append(s.ConstraintNames, c.Name.String())
 
 		switch c.Type {
 		case ConstraintTypePK:
@@ -218,29 +242,34 @@ func (p *Parser) LoadConstraints(ctx context.Context, s *Schema) error {
 
 func (p *Parser) LoadConstraintsColumns(ctx context.Context, s *Schema) error {
 	type constraintColumn struct {
-		table      string
-		column     string
-		constraint string
+		Table      Identifier
+		Column     string
+		Constraint Identifier
 	}
-	q := NewQuery[constraintColumn](`
-		-- constraints columns
-		SELECT
-			table_name,
-			column_name,
-			constraint_name
-		FROM
-			information_schema.constraint_column_usage
-		WHERE
-			table_schema || '.' || table_name = ANY($1)
-			AND constraint_name = ANY($2)`,
+	// TODO pg_get_constraintdef
+	q := db.NewQuery[constraintColumn](`
+-- constraints columns
+SELECT
+	ccu.table_schema,
+	ccu.table_name,
+	ccu.column_name,
+	ccu.constraint_schema,
+	ccu.constraint_name
+FROM
+	information_schema.constraint_column_usage ccu
+WHERE
+	ccu.table_schema || '.' || ccu.table_name = ANY($1)
+	AND ccu.constraint_schema || '.' || ccu.constraint_name = ANY($2)`,
 		s.TableNames, s.ConstraintNames)
 
 	constraintsColumns, err := q.All(ctx, p.db.Conn,
 		func(rows pgx.Rows, c *constraintColumn) error {
 			return rows.Scan(
-				&c.table,
-				&c.column,
-				&c.constraint,
+				&c.Table.Schema,
+				&c.Table.Name,
+				&c.Column,
+				&c.Constraint.Schema,
+				&c.Constraint.Name,
 			)
 		})
 	if err != nil {
@@ -249,24 +278,24 @@ func (p *Parser) LoadConstraintsColumns(ctx context.Context, s *Schema) error {
 	p.log.Debug("", zap.Reflect("constraints_columns", constraintsColumns))
 
 	for _, constraintColumn := range constraintsColumns {
-		constraint, ok := s.Constraints[constraintColumn.constraint]
+		constraint, ok := s.Constraints[constraintColumn.Constraint.String()]
 		if !ok {
-			return fmt.Errorf("constraint %q not found", constraintColumn.constraint)
+			return fmt.Errorf("constraint %q not found", constraintColumn.Constraint)
 		}
 
-		table, ok := s.Tables[constraintColumn.table]
+		table, ok := s.Tables[constraintColumn.Table.String()]
 		if !ok {
-			return fmt.Errorf("table %q not found for constraint %q", constraintColumn.table, constraintColumn.constraint)
+			return fmt.Errorf("table %q not found for constraint %q", constraintColumn.Table, constraintColumn.Constraint)
 		}
-		column, ok := table.Columns[constraintColumn.column]
+		column, ok := table.Columns[constraintColumn.Column]
 		if !ok {
 			return fmt.Errorf("column %q not found in table %q for constraint %q",
-				constraintColumn.column,
-				constraintColumn.table,
-				constraintColumn.constraint,
+				constraintColumn.Column,
+				constraintColumn.Table,
+				constraintColumn.Constraint,
 			)
 		}
-		constraint.Columns[constraintColumn.column] = column
+		constraint.Columns[constraintColumn.Column] = column
 	}
 
 	return nil
@@ -278,20 +307,20 @@ func (p *Parser) LoadForeignConstraints(ctx context.Context, s *Schema) error {
 		Unique  Identifier
 	}
 
-	q := NewQuery[foreignConstraint](`
-		-- foreign keys
-		SELECT
-			constraint_schema,
-			constraint_name,
-			unique_constraint_schema,
-			unique_constraint_name,
-			match_option,
-			update_rule,
-			delete_rule
-		FROM
-			information_schema.referential_constraints
-		WHERE
-			constraint_schema || '.' || constraint_name = ANY($1)`,
+	q := db.NewQuery[foreignConstraint](`
+-- foreign keys
+SELECT
+	constraint_schema,
+	constraint_name,
+	unique_constraint_schema,
+	unique_constraint_name,
+	match_option,
+	update_rule,
+	delete_rule
+FROM
+	information_schema.referential_constraints
+WHERE
+	constraint_schema || '.' || constraint_name = ANY($1)`,
 		s.ConstraintNames,
 	)
 
@@ -310,7 +339,7 @@ func (p *Parser) LoadForeignConstraints(ctx context.Context, s *Schema) error {
 	if err != nil {
 		return err
 	}
-	p.log.Info("", zap.Reflect("fk", foreignKeys))
+	p.log.Debug("", zap.Reflect("fk", foreignKeys))
 
 	for _, keys := range foreignKeys {
 		fk, ok := s.Constraints[keys.Foreign.String()]

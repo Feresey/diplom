@@ -1,4 +1,4 @@
-package schema
+package db
 
 import (
 	"context"
@@ -13,10 +13,6 @@ type Executor interface {
 	QueryRow(ctx context.Context, query string, args ...any) pgx.Row
 	Query(ctx context.Context, query string, args ...any) (pgx.Rows, error)
 }
-
-// type SQLizer interface {
-// 	ToSql() (query string, args []any, err error)
-// }
 
 type Error struct {
 	Err     error
@@ -33,36 +29,6 @@ func (e Error) Error() string {
 func (e Error) Pretty() string {
 	return fmt.Sprintf("%s: %v:\nquery:\n%s\n\n===\nargs: %+#v", e.Message, e.Err, e.Query, e.Args)
 }
-
-// type Scanner interface {
-// 	Scan(dest ...any) error
-// }
-
-// func QueryOne[T any](
-// 	ctx context.Context,
-// 	exec Executor,
-// 	sb SQLizer,
-// 	dest ...any,
-// ) (result T, err error) {
-// 	query, args, err := sb.ToSql()
-// 	if err != nil {
-// 		return result, Error{
-// 			Err:     err,
-// 			Message: "build query",
-// 		}
-// 	}
-
-// 	row := exec.QueryRow(ctx, query, args...)
-// 	if err := row.Scan(dest...); err != nil {
-// 		return result, Error{
-// 			Err:     err,
-// 			Message: "scan results",
-// 			Query:   query,
-// 			Args:    args,
-// 		}
-// 	}
-// 	return result, nil
-// }
 
 type Querier[T any] struct {
 	query string
