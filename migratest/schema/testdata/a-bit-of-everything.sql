@@ -1,6 +1,5 @@
 CREATE SCHEMA IF NOT EXISTS test;
 
-
 -- Создание DOMAIN
 CREATE DOMAIN test.name_domain AS VARCHAR(100);
 
@@ -57,7 +56,9 @@ CREATE TABLE test.users (
 CREATE TABLE test.products (
   id INTEGER PRIMARY KEY,
   name VARCHAR(50),
-  prices INTEGER [] NOT NULL,
+  prices_1 INTEGER [] NOT NULL,
+  prices_2 INTEGER [2][3] NOT NULL,
+  prices_3 INTEGER [][] NOT NULL,
   discount_range INT4RANGE,
   quantity_range INT4RANGE NOT NULL CONSTRAINT products_quantity_range_check CHECK (quantity_range <> '[,)')
 );

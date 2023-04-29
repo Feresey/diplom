@@ -3,9 +3,6 @@ package schema
 import (
 	_ "embed"
 	"fmt"
-	"strings"
-
-	"github.com/volatiletech/null/v8"
 )
 
 type Identifier struct {
@@ -13,11 +10,13 @@ type Identifier struct {
 	Name   string
 }
 
-func (i Identifier) String() string { return fmt.Sprintf(`%s.%s`, i.Schema, i.Name) }
+// TODO нужно ли добавлять "%s"."%s"?
+func (i Identifier) String() string { return i.Schema + "." + i.Name }
 
 // Schema отражает схему, расположенную в базе данных
 type Schema struct {
 	// TODO UserTypes
+	Types map[string]*DBType
 
 	// Таблицы
 	Tables map[string]*Table
@@ -33,7 +32,6 @@ type Schema struct {
 type Table struct {
 	// имя таблицы
 	Name Identifier
-	// TODO имена в порядке базы
 	// мапа колонок, где ключ - имя колонки хранить имена как
 	Columns map[string]*Column
 	// имена колонок в том же порядке что и в базе
@@ -69,105 +67,111 @@ type Column struct {
 	// Таблица, которой принадлежит колонка
 	Table *Table
 	// Тип колонки
-	Type DBType
+	Type *DBType
 	// Аттрибуты колонки
 	Attributes ColumnAttributes
 }
 
+//go:generate enumer -type DataType -trimprefix DataType
+type DataType int
+
+const (
+	DataTypeUndefined DataType = iota
+	DataTypeBuiltIn            // встроенные базовые типы. INT, BOOL, DATE, TEXT, INET, CIDR
+	DataTypeArray              // массивы. INT[]
+	DataTypeEnum               // Enum тип.
+	DataTypeRange              // Тип-диапазон. INT4RANGE
+	DataTypeComposite          // Тип-структура.
+	DataTypeDomain             // Домен. Основан на любом другом типе и включает в себя ограничения для него
+)
+
 // DBType описывает тип данных базы
 type DBType struct {
-	// Pretty type
-	Type       string
-	IsUserType bool
+	// Имя типа
+	TypeName Identifier
+	DataType DataType
+	// для типов с ограничением длины. VARCHAR(100)
+	CharMaxLength int
 
-	// Underlying type
-	UDTSchema null.String
-	UDT       null.String
-
-	IsArray bool
-
-	Enum  string
-	Range string
-
-	DomainSchema null.String
-	Domain       null.String
-
-	CharMaxLength null.Int
+	ArrayType     *ArrayType
+	EnumType      *EnumType
+	CompositeType *CompositeType
+	DomainType    *DomainType
+	RangeType     *RangeType
 }
 
-func (t DBType) String() string {
-	if t.IsUserType {
-		return fmt.Sprintf("%s.%s", t.UDTSchema.String, t.UDT.String)
-	}
-	if t.IsArray {
-		var arrayNestedCount int
-		arrayElemType := strings.TrimLeftFunc(t.UDT.String, func(r rune) bool {
-			if r == '_' {
-				arrayNestedCount++
-				return true
-			}
-			return false
-		})
-		// TODO get nested type info
-		return fmt.Sprintf("%s.%s%s",
-			t.UDTSchema.String,
-			arrayElemType,
-			strings.Repeat("[]", arrayNestedCount),
-		)
-	}
-	if t.Domain.Valid {
-		return fmt.Sprintf("%s.%s", t.DomainSchema.String, t.Domain.String)
-	}
-	return t.Type
+type ArrayType struct {
+	TypeName Identifier
+	// Уровень вложенности массива, например INTEGER[][]
+	NestedCount int
+	// TODO INT[4] - что с этим делать?
+	// Тип элемента массива. INTEGER[][] -> INTEGER
+	ElemType *DBType
+}
+
+/*
+	SELECT
+	n.nspname AS schema_name,
+	t.typname AS enum_name,
+	array_agg(e.enumlabel) AS enum_values
+
+FROM
+
+	pg_type t
+	JOIN pg_enum e ON t.oid = e.enumtypid
+	JOIN pg_namespace n ON n.oid = t.typnamespace
+
+WHERE
+
+	n.nspname = 'your_schema_name' AND
+	t.typname = 'your_enum_name'
+
+GROUP BY
+
+	schema_name, enum_name;
+*/
+type EnumType struct {
+	TypeName Identifier
+	Values   []string
+}
+
+// TODO а что я вообще могу сделать с composite типом?
+type CompositeType struct {
+	TypeName   Identifier
+	Attributes map[string]*CompositeAttribute
+}
+
+type CompositeAttribute struct {
+	// Имя аттрибута
+	Name string
+	// COMPOSITE TYPE к которому относится аттрибут
+	CompositeType *CompositeType
+	// Тип аттрибута
+	Type *DBType
+}
+
+type DomainType struct {
+	TypeName Identifier
+}
+
+type RangeType struct {
+	TypeName Identifier
+	ElemType *DBType
 }
 
 // ColumnAttributes описывает аттрибуты колонки
 type ColumnAttributes struct {
-	// Дефолтное значение (если указано), так же может быть SQL выражением
-	Default null.String
+	IsDefault bool
+	// Дефолтное значение
+	Default string
 	// Допустимы ли NULL значения колонки
 	Nullable bool
 	// Генерируемое значение колонки (может быть задано явно)
 	ISGenerated bool
 	// Условие генерации
-	Generated null.String
+	Generated string
 }
 
-func (ca ColumnAttributes) String() string {
-	var sb strings.Builder
-	var needSpace bool
-	space := func() {
-		if needSpace {
-			sb.WriteByte(' ')
-			needSpace = false
-		} else {
-			needSpace = true
-		}
-	}
-
-	if !ca.Nullable {
-		space()
-		sb.WriteString("NOT NULL")
-	}
-
-	if ca.Default.Valid {
-		space()
-		sb.WriteString("DEFAULT ")
-		sb.WriteString(ca.Default.String)
-	}
-
-	if ca.ISGenerated {
-		space()
-		sb.WriteString("GENERATED ALWAYS AS ")
-		sb.WriteString(ca.Generated.String)
-		sb.WriteString(" STORED")
-	}
-
-	return sb.String()
-}
-
-// TODO
-//
 //go:generate enumer -type ConstraintType -trimprefix ConstraintType
 type ConstraintType int
 

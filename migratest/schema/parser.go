@@ -28,7 +28,7 @@ func NewParser(
 	}
 }
 
-// TODO вернуть ошибку если есть ссылка на не указанную схему
+// TODO вернуть ошибку если данные ссылаются на не указанную схему
 func (p *Parser) LoadSchema(ctx context.Context, schemas []string) (*Schema, error) {
 	var s Schema
 
@@ -123,7 +123,7 @@ WHERE
 				&c.Table.Schema,
 
 				&c.Name,
-				&c.Type.Type,
+				&c.Type.TypeName,
 				&c.Type.IsArray,
 				&c.Type.IsUserType,
 				&c.Type.UDTSchema,
@@ -231,7 +231,6 @@ WHERE
 		case ConstraintTypePK:
 			table.PrimaryKey = &c
 		case ConstraintTypeFK:
-			// FIXME
 			// для FK запрос отдаёт таблицу, на которую этот FK ссылается
 			table.ReferencedBy[c.Name.String()] = &c
 		}
@@ -246,7 +245,6 @@ func (p *Parser) LoadConstraintsColumns(ctx context.Context, s *Schema) error {
 		Column     string
 		Constraint Identifier
 	}
-	// TODO pg_get_constraintdef
 	q := db.NewQuery[constraintColumn](`
 -- constraints columns
 SELECT
@@ -352,7 +350,6 @@ WHERE
 			return fmt.Errorf("constraint %q not found", keys.Foreign)
 		}
 
-		// FIXME
 		// таблица, в которой есть FK
 		fk.Table.ForeignKeys[fk.Name.String()] = ForeignKey{
 			Uniq:    uniq,
