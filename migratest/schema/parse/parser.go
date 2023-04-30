@@ -60,7 +60,7 @@ func (p *Parser) LoadTables(ctx context.Context, s *schema.Schema, schemas []str
 		p.log.Error("failed to query tables", zap.Error(err))
 		return err
 	}
-	// TODO debug log
+	p.log.Debug("loaded tables", zap.Reflect("tables", tables))
 
 	s.Tables = make(map[string]*schema.Table, len(tables))
 	s.TableNames = make([]string, 0, len(tables))
@@ -72,7 +72,7 @@ func (p *Parser) LoadTables(ctx context.Context, s *schema.Schema, schemas []str
 			},
 			Columns:      make(map[string]*schema.Column),
 			Constraints:  make(map[string]*schema.Constraint),
-			ForeignKeys:  make(map[string]schema.ForeignKey),
+			ForeignKeys:  make(map[string]*schema.ForeignKey),
 			ReferencedBy: make(map[string]*schema.Constraint),
 		}
 
@@ -142,7 +142,7 @@ func (p *Parser) LoadConstraints(ctx context.Context, s *schema.Schema) error {
 		p.log.Error("failed to query tables constraints", zap.Error(err))
 		return err
 	}
-	// TODO debug log
+	p.log.Debug("loaded constraints", zap.Reflect("constraints", constraints))
 
 	s.Constraints = make(map[string]*schema.Constraint, len(constraints))
 	s.ConstraintNames = make([]string, 0, len(constraints))
@@ -174,6 +174,7 @@ func (p *Parser) LoadConstraints(ctx context.Context, s *schema.Schema) error {
 		}
 
 		s.Constraints[c.Name.String()] = c
+		table.Constraints[c.Name.String()] = c
 		s.ConstraintNames = append(s.ConstraintNames, c.Name.String())
 
 		// TODO это точно должно быть здесь?
@@ -199,11 +200,11 @@ func (p *Parser) LoadConstraintsColumns(ctx context.Context, s *schema.Schema) e
 
 	for _, dbc := range constraintsColumns {
 		constraintName := schema.Identifier{
-			Schema: dbc.ConstraintSchema,
+			Schema: dbc.SchemaName,
 			Name:   dbc.ConstraintName,
 		}
 		tableName := schema.Identifier{
-			Schema: dbc.TableSchema,
+			Schema: dbc.SchemaName,
 			Name:   dbc.TableName,
 		}
 
@@ -230,13 +231,22 @@ func (p *Parser) LoadConstraintsColumns(ctx context.Context, s *schema.Schema) e
 	return nil
 }
 
+/*
+SELECT *
+
+	FROM pg_constraint
+	JOIN pg_class ON pg_constraint.conrelid = pg_class.oid
+	JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid AND pg_attribute.attnum = ANY(pg_constraint.conkey)
+	WHERE
+	  pg_class.relname = 'departments';
+*/
 func (p *Parser) LoadForeignConstraints(ctx context.Context, s *schema.Schema) error {
 	fks, err := QueryForeignKeys(ctx, p.db.Conn, s.ConstraintNames)
 	if err != nil {
 		p.log.Error("failed to query foreign constraints", zap.Error(err))
 		return err
 	}
-	// TODO debug log
+	p.log.Debug("loaded foreign constraints", zap.Reflect("constraints", fks))
 
 	for _, dbfk := range fks {
 		fkName := schema.Identifier{
@@ -257,7 +267,7 @@ func (p *Parser) LoadForeignConstraints(ctx context.Context, s *schema.Schema) e
 		}
 
 		// таблица, которая ссылается
-		fk.Table.ForeignKeys[fk.Name.String()] = schema.ForeignKey{
+		fk.Table.ForeignKeys[fk.Name.String()] = &schema.ForeignKey{
 			Uniq:    uniq,
 			Foreign: fk,
 		}

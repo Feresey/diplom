@@ -1,12 +1,14 @@
--- constraints columns
+-- foreign keys
 SELECT
-	ccu.table_schema,
-	ccu.table_name,
-	ccu.column_name,
-	ccu.constraint_schema,
-	ccu.constraint_name
-FROM
-	information_schema.constraint_column_usage ccu
+	ns.nspname AS constraint_schema,
+	c.conname AS constraint_name,
+	nc.relname AS table_name,
+	a.attname AS column_name
+FROM pg_constraint c
+	JOIN pg_class nc ON c.conrelid = nc.oid
+	JOIN pg_attribute a ON a.attrelid = nc.oid
+		AND a.attnum = ANY(c.conkey)
+	JOIN pg_namespace ns ON ns.oid = c.connamespace
 WHERE
-	ccu.table_schema || '.' || ccu.table_name = ANY($1)
-	AND ccu.constraint_schema || '.' || ccu.constraint_name = ANY($2)
+	ns.nspname || '.' || nc.relname = ANY($1)
+	AND ns.nspname || '.' || c.conname = ANY($2)

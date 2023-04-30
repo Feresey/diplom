@@ -35,7 +35,7 @@ type Table struct {
 	// Главный ключ таблицы (может быть nil)
 	PrimaryKey *Constraint
 	// Внешние ключи таблицы, ключ мапы - FK
-	ForeignKeys map[string]ForeignKey
+	ForeignKeys map[string]*ForeignKey
 	// Ключи, которые ссылаются на эту таблицу, ключ мапы - UNIQUE CONSTRAINT
 	ReferencedBy map[string]*Constraint
 
@@ -86,7 +86,8 @@ type DBType struct {
 	TypeName Identifier
 	DataType DataType
 	// для типов с ограничением длины. VARCHAR(100)
-	CharMaxLength int
+	HasCharMaxLength bool
+	CharMaxLength    int
 
 	ArrayType     *ArrayType
 	EnumType      *EnumType
@@ -169,9 +170,7 @@ type ColumnAttributes struct {
 	Generated string
 }
 
-// TODO upper
-//
-//go:generate enumer -type ConstraintType -trimprefix ConstraintType -transform upper
+//go:generate enumer -type ConstraintType -trimprefix ConstraintType
 type ConstraintType int
 
 const (
@@ -194,8 +193,10 @@ type Constraint struct {
 	Type ConstraintType
 	// Только для UNIQUE индекса
 	NullsNotDistinct bool
+
 	// Результат функции pg_getconstraintdef. Я не уверен что это вообще нужно, но пусть будет.
 	Definition string
+
 	// Колонки, на которые действует ограничение
 	// Колонки всегда принадлежат той же таблице, которой принадлежит ограничение
 	// Количество колонок всегда >= 1

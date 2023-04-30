@@ -138,11 +138,10 @@ func QueryForeignKeys(
 var queryConstraintsColumnsSQL string
 
 type queryConstraintsColumns struct {
-	TableSchema      string
-	TableName        string
-	ColumnName       string
-	ConstraintSchema string
-	ConstraintName   string
+	SchemaName     string
+	ConstraintName string
+	TableName      string
+	ColumnName     string
 }
 
 func QueryConstraintsColumns(
@@ -155,11 +154,10 @@ func QueryConstraintsColumns(
 		ctx, exec, queryConstraintsColumnsSQL,
 		func(s pgx.Rows, q *queryConstraintsColumns) error {
 			return s.Scan(
-				&q.TableSchema,
+				&q.SchemaName,
+				&q.ConstraintName,
 				&q.TableName,
 				&q.ColumnName,
-				&q.ConstraintSchema,
-				&q.ConstraintName,
 			)
 		}, tableNames, constraintNames)
 }

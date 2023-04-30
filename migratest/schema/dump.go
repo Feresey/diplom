@@ -39,6 +39,7 @@ func (s *Schema) Dump(w io.Writer) error {
 
 	err = tpl.ExecuteTemplate(&buf, "dump.tpl", s)
 	if err != nil {
+		_, _ = buf.WriteTo(w)
 		return err
 	}
 

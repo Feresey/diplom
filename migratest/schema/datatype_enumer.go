@@ -6,9 +6,9 @@ import (
 	"fmt"
 )
 
-const _DataTypeName = "UndefinedBuiltInArrayEnumRangeCompositeDomainUser"
+const _DataTypeName = "UndefinedBuiltInArrayEnumRangeCompositeDomain"
 
-var _DataTypeIndex = [...]uint8{0, 9, 16, 21, 25, 30, 39, 45, 49}
+var _DataTypeIndex = [...]uint8{0, 9, 16, 21, 25, 30, 39, 45}
 
 func (i DataType) String() string {
 	if i < 0 || i >= DataType(len(_DataTypeIndex)-1) {
@@ -17,7 +17,7 @@ func (i DataType) String() string {
 	return _DataTypeName[_DataTypeIndex[i]:_DataTypeIndex[i+1]]
 }
 
-var _DataTypeValues = []DataType{0, 1, 2, 3, 4, 5, 6, 7}
+var _DataTypeValues = []DataType{0, 1, 2, 3, 4, 5, 6}
 
 var _DataTypeNameToValueMap = map[string]DataType{
 	_DataTypeName[0:9]:   0,
@@ -27,7 +27,6 @@ var _DataTypeNameToValueMap = map[string]DataType{
 	_DataTypeName[25:30]: 4,
 	_DataTypeName[30:39]: 5,
 	_DataTypeName[39:45]: 6,
-	_DataTypeName[45:49]: 7,
 }
 
 // DataTypeString retrieves an enum value from the enum constants string name.
