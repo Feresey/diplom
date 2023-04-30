@@ -31,41 +31,55 @@ func QueryTables(ctx context.Context, exec Executor, schemas []string) ([]queryT
 var queryTablesColumnsSQL string
 
 type queryTablesColumns struct {
-	TableName              string
-	TableSchema            string
-	ColumnName             string
-	DataType               string
-	UdtSchema              null.String
-	UdtName                null.String
-	CharacterMaximumLength null.Int
-	DomainSchema           null.String
-	DomainName             null.String
-	IsNullable             bool
-	ColumnDefault          null.String
-	IsGenerated            null.Bool
-	GenerationExpression   null.String
+	TableSchema         string
+	TableName           string
+	ColumnName          string
+	TypeSchema          string
+	TypeName            string
+	TypeType            string
+	IsNullable          bool
+	HasDefault          bool
+	IsGenerated         bool
+	DefaultExpr         null.String
+	ArrayDims           int
+	TypeMaxLength       null.Int
+	CompositeSchema     null.String
+	CompositeType       null.String
+	DomainIsNotNullable bool
+	DomainType          null.String
+	DomainTypeMaxLength null.Int
+	DomainArrayDims     int
 }
 
-func QueryTablesColumns(ctx context.Context, exec Executor, tables []string) ([]queryTablesColumns, error) {
+func QueryTablesColumns(
+	ctx context.Context,
+	exec Executor,
+	tableNames []string,
+) ([]queryTablesColumns, error) {
 	return QueryAll(
 		ctx, exec, queryTablesColumnsSQL,
 		func(s pgx.Rows, q *queryTablesColumns) error {
 			return s.Scan(
-				&q.TableName,
 				&q.TableSchema,
+				&q.TableName,
 				&q.ColumnName,
-				&q.DataType,
-				&q.UdtSchema,
-				&q.UdtName,
-				&q.CharacterMaximumLength,
-				&q.DomainSchema,
-				&q.DomainName,
+				&q.TypeSchema,
+				&q.TypeName,
+				&q.TypeType,
 				&q.IsNullable,
-				&q.ColumnDefault,
+				&q.HasDefault,
 				&q.IsGenerated,
-				&q.GenerationExpression,
+				&q.DefaultExpr,
+				&q.ArrayDims,
+				&q.TypeMaxLength,
+				&q.CompositeSchema,
+				&q.CompositeType,
+				&q.DomainIsNotNullable,
+				&q.DomainType,
+				&q.DomainTypeMaxLength,
+				&q.DomainArrayDims,
 			)
-		}, tables)
+		}, tableNames)
 }
 
 //go:embed queries/tables_constraints.sql

@@ -12,14 +12,17 @@ func (i Identifier) String() string { return i.Schema + "." + i.Name }
 // Schema отражает схему, расположенную в базе данных
 type Schema struct {
 	// TODO загрузка типов
-	Types map[string]*DBType
-	// Таблицы
-	Tables map[string]*Table
-	// имена таблиц в том же порядке что и в базе
+	Types          map[string]*DBType
+	ArrayTypes     map[string]*ArrayType
+	CompositeTypes map[string]*CompositeType
+	EnumTypes      map[string]*EnumType
+	RangeTypes     map[string]*RangeType
+	DomainTypes    map[string]*DomainType
+	Tables         map[string]*Table
+	Constraints    map[string]*Constraint
+	// имена том же порядке что и в базе
 	TableNames []string
-	// Все индексы
-	Constraints map[string]*Constraint
-	// имена индексов в том же порядке что и в базе
+	// TODO это нужно вообще?
 	ConstraintNames []string
 }
 
@@ -72,7 +75,7 @@ type DataType int
 
 const (
 	DataTypeUndefined DataType = iota
-	DataTypeBuiltIn            // встроенные базовые типы. INT, BOOL, DATE, TEXT, INET, CIDR
+	DataTypeBase               // встроенные базовые типы. INT, BOOL, DATE, TEXT, INET, CIDR
 	DataTypeArray              // массивы. INT[]
 	DataTypeEnum               // Enum тип.
 	DataTypeRange              // Тип-диапазон. INT4RANGE
@@ -84,10 +87,7 @@ const (
 type DBType struct {
 	// Имя типа
 	TypeName Identifier
-	DataType DataType
-	// для типов с ограничением длины. VARCHAR(100)
-	HasCharMaxLength bool
-	CharMaxLength    int
+	Type     DataType
 
 	ArrayType     *ArrayType
 	EnumType      *EnumType
@@ -98,9 +98,6 @@ type DBType struct {
 
 type ArrayType struct {
 	TypeName Identifier
-	// Уровень вложенности массива, например INTEGER[][]
-	NestedCount int
-	// TODO INT[4] - что с этим делать?
 	// Тип элемента массива. INTEGER[][] -> INTEGER
 	ElemType *DBType
 }
@@ -150,6 +147,7 @@ type CompositeAttribute struct {
 
 type DomainType struct {
 	TypeName Identifier
+	ElemType *DBType
 }
 
 type RangeType struct {
@@ -159,15 +157,17 @@ type RangeType struct {
 
 // ColumnAttributes описывает аттрибуты колонки
 type ColumnAttributes struct {
-	IsDefault bool
+	// Есть ли дефолтное значение (или GENERATED ALWAYS)
+	HasDefault bool
 	// Дефолтное значение
 	Default string
 	// Допустимы ли NULL значения колонки
 	Nullable bool
-	// Генерируемое значение колонки (может быть задано явно)
-	ISGenerated bool
-	// Условие генерации
-	Generated string
+	// для типов с ограничением длины. VARCHAR(100)
+	HasCharMaxLength bool
+	CharMaxLength    int
+	// Уровень вложенности массива, например INTEGER[][]
+	ArrayDims int
 }
 
 //go:generate enumer -type ConstraintType -trimprefix ConstraintType

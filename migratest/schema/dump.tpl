@@ -1,27 +1,23 @@
-{{- define "dump-typename"}}
-{{.TypeName}}{{if .HasMaxCharLength}}({{.MaxCharLength}}){{end}}
-{{- end}}
-
 {{- define "dump-type"}}
-    {{- with .Type}}
-        {{- if eq . "BUILTIN"}}
-            {{- template "dump-typename" .}}
-        {{- else if eq . "ARRAY"}}
+    {{- with .}}{{$type := .Type.String}}
+        {{- if eq $type "Base"}}
+            {{- .TypeName.Name | upper}}
+        {{- else if eq $type "Array"}}
             {{- with .ArrayType}}
-                {{- template "dump-typename" .}}
+                {{- .TypeName.String}}
             {{- else -}}
                 <ARRAY TYPE IS NOT SPECIFIED>
             {{- end}}
-        {{- else if eq . "ENUM"}}
-            {{- template "dump-typename" .}}
-        {{- else if eq . "RANGE"}}
-            {{- template "dump-typename" .}}
-        {{- else if eq . "COMPOSITE"}}
-            {{- template "dump-typename" .}}
-        {{- else if eq . "DOMAIN"}}
-            {{- template "dump-typename" .}}
+        {{- else if eq $type "Enum"}}
+            {{- .TypeName.String }}
+        {{- else if eq $type "Range"}}
+            {{- .TypeName.String }}
+        {{- else if eq $type "Composite"}}
+            {{- .TypeName.String }}
+        {{- else if eq $type "Domain"}}
+            {{- .TypeName.String }}
         {{- else -}}
-            <DATA TYPE IS UNDEFINED>
+            <DATA TYPE IS UNDEFINED> {{$type}}
         {{- end}}
     {{- else -}}
         <DATA TYPE IS NOT SPECIFIED>
@@ -44,10 +40,10 @@ TABLE {{$table.Name}} (
 {{- /* range columns */}}
 {{- $maxlen := 0}}{{range $table.ColumnNames}}{{if gt (len .) $maxlen}}{{$maxlen = len .}}{{end}}{{end}}
 {{- range $table.ColumnNames }}{{$column := index $table.Columns .}}
-    {{$column.Name}} {{- space (len $column.Name) $maxlen }} {{template "dump-type"}} {{$column.Attributes}}
+    {{$column.Name}} {{- space (len $column.Name) $maxlen }} {{template "dump-type" $column.Type}} {{$column.Attributes}}
     {{- range $fk_id, $fk := $table.ForeignKeys}}
     {{- with index $fk.Foreign.Columns $column.Name}}
-    {{- ""}} {{ $fk.Foreign.Name}} REFERENCES {{$fk.Uniq.Table.Name}}({{$fk.Uniq.Columns | columnNames}})
+    {{- ""}} CONSTRAINT {{ $fk.Foreign.Name}} REFERENCES {{$fk.Uniq.Table.Name}}({{$fk.Uniq.Columns | columnNames}})
     {{- end}}
     {{- end}}
     {{- with $table.PrimaryKey}}{{with index .Columns $column.Name}}

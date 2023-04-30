@@ -30,7 +30,7 @@ CREATE TABLE test.roles (
 -- Создание таблицы с PRIMARY KEY, UNIQUE, CHECK, FOREIGN KEY ограничениями
 CREATE TABLE test.users (
   id SERIAL PRIMARY KEY,
-  name name_domain NOT NULL,
+  name test.name_domain NOT NULL,
   email VARCHAR(100) UNIQUE NOT NULL,
   age INTEGER CHECK (age > 0),
   full_name test.custom_type,
