@@ -1,9 +1,9 @@
--- foreign keys
+-- constraint columns
 SELECT
-	ns.nspname AS constraint_schema,
-	c.conname AS constraint_name,
+	ns.nspname AS schema_name,
+	c.conname  AS constraint_name,
 	nc.relname AS table_name,
-	a.attname AS column_name
+	a.attname  AS column_name
 FROM pg_constraint c
 	JOIN pg_class nc ON c.conrelid = nc.oid
 	JOIN pg_attribute a ON a.attrelid = nc.oid

@@ -98,33 +98,10 @@ type DBType struct {
 
 type ArrayType struct {
 	TypeName Identifier
-	// Тип элемента массива. INTEGER[][] -> INTEGER
+	// Тип элемента массива. INTEGER[] -> INTEGER
 	ElemType *DBType
 }
 
-/*
-TODO
-
-	SELECT
-	n.nspname AS schema_name,
-	t.typname AS enum_name,
-	array_agg(e.enumlabel) AS enum_values
-
-FROM
-
-	pg_type t
-	JOIN pg_enum e ON t.oid = e.enumtypid
-	JOIN pg_namespace n ON n.oid = t.typnamespace
-
-WHERE
-
-	n.nspname = 'your_schema_name' AND
-	t.typname = 'your_enum_name'
-
-GROUP BY
-
-	schema_name, enum_name;
-*/
 type EnumType struct {
 	TypeName Identifier
 	Values   []string
@@ -146,8 +123,9 @@ type CompositeAttribute struct {
 }
 
 type DomainType struct {
-	TypeName Identifier
-	ElemType *DBType
+	TypeName   Identifier
+	Attributes DomainAttributes
+	ElemType   *DBType
 }
 
 type RangeType struct {
@@ -155,12 +133,7 @@ type RangeType struct {
 	ElemType *DBType
 }
 
-// ColumnAttributes описывает аттрибуты колонки
-type ColumnAttributes struct {
-	// Есть ли дефолтное значение (или GENERATED ALWAYS)
-	HasDefault bool
-	// Дефолтное значение
-	Default string
+type DomainAttributes struct {
 	// Допустимы ли NULL значения колонки
 	Nullable bool
 	// для типов с ограничением длины. VARCHAR(100)
@@ -168,6 +141,15 @@ type ColumnAttributes struct {
 	CharMaxLength    int
 	// Уровень вложенности массива, например INTEGER[][]
 	ArrayDims int
+}
+
+// ColumnAttributes описывает аттрибуты колонки
+type ColumnAttributes struct {
+	DomainAttributes
+	// Есть ли дефолтное значение (или GENERATED ALWAYS)
+	HasDefault bool
+	// Дефолтное значение
+	Default string
 }
 
 //go:generate enumer -type ConstraintType -trimprefix ConstraintType
