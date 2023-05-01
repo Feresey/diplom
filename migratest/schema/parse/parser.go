@@ -132,7 +132,7 @@ func (p *Parser) LoadTablesColumns(ctx context.Context, s *schema.Schema) error 
 			Name:   dbcolumn.TableName,
 		}
 		typeName := schema.Identifier{
-			Schema: dbcolumn.SchemaName,
+			Schema: dbcolumn.TypeSchema,
 			Name:   dbcolumn.TypeName,
 		}
 		table, ok := s.Tables[tableName.String()]
@@ -152,6 +152,7 @@ func (p *Parser) LoadTablesColumns(ctx context.Context, s *schema.Schema) error 
 				TypeName: typeName,
 				Type:     typeType,
 			}
+			p.log.Debug("add type", zap.Stringer("type", typ.TypeName))
 			s.Types[typeName.String()] = typ
 		}
 
@@ -163,7 +164,7 @@ func (p *Parser) LoadTablesColumns(ctx context.Context, s *schema.Schema) error 
 				HasDefault: dbcolumn.HasDefault || dbcolumn.IsGenerated,
 				Default:    dbcolumn.DefaultExpr.String,
 				DomainAttributes: schema.DomainAttributes{
-					Nullable:         dbcolumn.IsNullable,
+					NotNullable:      dbcolumn.IsNullable,
 					HasCharMaxLength: dbcolumn.CharacterMaxLength.Valid,
 					CharMaxLength:    dbcolumn.CharacterMaxLength.Int,
 					ArrayDims:        dbcolumn.ArrayDims,
@@ -354,6 +355,10 @@ func (p *Parser) loadTypes(
 	if err != nil {
 		return nil, err
 	}
+	p.log.Debug("load types",
+		zap.Strings("type_names", typeNames),
+		zap.Reflect("types", types),
+	)
 
 	for _, dbtype := range types {
 		typeName := schema.Identifier{
@@ -390,6 +395,11 @@ func (p *Parser) fillType(
 	}
 	typ.Type = typType
 
+	p.log.Debug("fill type",
+		zap.Stringer("type", typ.TypeName),
+		zap.Stringer("typ", typType),
+	)
+
 	switch typType {
 	default:
 		return nil, fmt.Errorf("data type is undefined: %+#v", typ)
@@ -424,6 +434,10 @@ func (p *Parser) fillType(
 			return nil, err
 		}
 		typ.RangeType = rng
+		p.log.Debug("make range type",
+			zap.Stringer("type", typ.TypeName),
+			zap.Stringer("range", rng.ElemType.TypeName),
+		)
 		if needLoad != nil {
 			moreTypes = append(moreTypes, needLoad.String())
 		}
@@ -469,7 +483,7 @@ func (p *Parser) makeDomainType(
 	domain = &schema.DomainType{
 		TypeName: domainTypeName,
 		Attributes: schema.DomainAttributes{
-			Nullable:         !dbtype.DomainIsNotNullable,
+			NotNullable:      !dbtype.DomainIsNotNullable,
 			HasCharMaxLength: dbtype.DomainCharacterMaxSize.Valid,
 			CharMaxLength:    dbtype.DomainCharacterMaxSize.Int,
 			ArrayDims:        dbtype.DomainArrayDims,
@@ -497,7 +511,7 @@ func (p *Parser) makeArrayType(
 	// Тип элемента массива
 	elemTypeName := schema.Identifier{
 		Schema: dbtype.ElemTypeSchema.String,
-		Name:   dbtype.ElemTypeSchema.String,
+		Name:   dbtype.ElemTypeName.String,
 	}
 	elemType, ok := s.Types[elemTypeName.String()]
 	if !ok {

@@ -23,6 +23,9 @@ func queryMessageLog(log *zap.Logger) func(
 	data map[string]any,
 ) {
 	return func(ctx context.Context, level tracelog.LogLevel, msg string, data map[string]any) {
+		if msg == "Prepare" {
+			return
+		}
 		var rawSql *string
 		fields := make([]zapcore.Field, 0, len(data))
 		for k, v := range data {
@@ -48,7 +51,7 @@ func queryMessageLog(log *zap.Logger) func(
 			lvl = zapcore.ErrorLevel
 		}
 		if rawSql != nil {
-			msg = msg + " " + *rawSql
+			msg = msg + "\n" + *rawSql
 		}
 		ce := log.Check(lvl, msg)
 		ce.Write(fields...)

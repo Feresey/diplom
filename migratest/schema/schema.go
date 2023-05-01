@@ -135,7 +135,7 @@ type RangeType struct {
 
 type DomainAttributes struct {
 	// Допустимы ли NULL значения колонки
-	Nullable bool
+	NotNullable bool
 	// для типов с ограничением длины. VARCHAR(100)
 	HasCharMaxLength bool
 	CharMaxLength    int

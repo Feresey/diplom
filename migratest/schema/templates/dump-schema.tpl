@@ -64,5 +64,5 @@ TABLE {{$table.Name}} (
         {{- ""}} {{.Definition}}
     {{- end}}
 {{- end}}
-)
+);
 {{/* range tables */}}{{end}}

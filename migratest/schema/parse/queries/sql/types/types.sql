@@ -4,7 +4,7 @@ SELECT
 	t.typtype::TEXT AS type_type,
 	-- array types
 	t.typcategory = 'A' AS is_array,
-	ns_e.nspname        AS element_type_shema,
+	et_ns.nspname       AS element_type_shema,
 	et.typname          AS element_type_name,
 	-- domain types
 	t.typnotnull AS domain_is_not_nullable,
@@ -21,7 +21,7 @@ FROM
 	pg_type t
 	JOIN pg_namespace ns          ON t.typnamespace = ns.oid
 	LEFT JOIN pg_type et          ON t.typelem = et.oid
-	LEFT JOIN pg_namespace ns_e   ON et.typnamespace = ns_e.oid
+	LEFT JOIN pg_namespace et_ns   ON et.typnamespace = et_ns.oid
 	LEFT JOIN pg_type dt          ON t.typbasetype = dt.oid
 	LEFT JOIN pg_namespace nd     ON dt.typnamespace = nd.oid
 	LEFT JOIN pg_range rng        ON rng.rngtypid = t.oid

@@ -139,10 +139,12 @@ func launch(ctx context.Context, log *zap.Logger, parser *parse.Parser) error {
 		return fmt.Errorf("error loading schema: %w", err)
 	}
 
+	log.Info("dump schema")
 	if err := s.Dump(os.Stdout, schema.DumpSchemaTemplate); err != nil {
 		return fmt.Errorf("failed to dump schema: %w", err)
 	}
 
+	log.Info("dump types")
 	if err := s.Dump(os.Stdout, schema.DumpTypesTemplate); err != nil {
 		return fmt.Errorf("failed to dump types: %w", err)
 	}
