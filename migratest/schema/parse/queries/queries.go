@@ -3,28 +3,49 @@ package queries
 import (
 	"context"
 	_ "embed"
+	"fmt"
 
+	"github.com/Feresey/mtest/config"
+	"github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5"
 	"github.com/volatiletech/null/v8"
 )
-
-//go:embed sql/tables.sql
-var queryTablesSQL string
 
 type Tables struct {
 	Schema string
 	Table  string
 }
 
-func QueryTables(ctx context.Context, exec Executor, schemas []string) ([]Tables, error) {
+func QueryTables(ctx context.Context, exec Executor, c config.Parser) ([]Tables, error) {
+	var sqlPatterns []squirrel.Sqlizer
+	for _, pattern := range c.Patterns {
+		schema := squirrel.Expr("schemaname LIKE ?", pattern.Schema)
+		if pattern.Tables == "" {
+			sqlPatterns = append(sqlPatterns, schema)
+		}
+		table := squirrel.Expr("tablename LIKE ?", pattern.Tables)
+
+		sqlPatterns = append(sqlPatterns, squirrel.And([]squirrel.Sqlizer{schema, table}))
+	}
+
+	query, args, err := squirrel.Select(
+		"schemaname",
+		"tablename",
+	).From("pg_tables").
+		PlaceholderFormat(squirrel.Dollar).
+		Where(squirrel.Or(sqlPatterns)).ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("build tables query: %w", err)
+	}
+
 	return QueryAll(
-		ctx, exec, queryTablesSQL,
+		ctx, exec, query,
 		func(scan pgx.Rows, v *Tables) error {
 			return scan.Scan(
 				&v.Schema,
 				&v.Table,
 			)
-		}, schemas)
+		}, args...)
 }
 
 //go:embed sql/columns.sql
@@ -140,7 +161,10 @@ type ConstraintColumn struct {
 	ColumnName     string
 }
 
-func QueryConstraintColumns(ctx context.Context, exec Executor, tableNames []string, constraintNames []string) ([]ConstraintColumn, error) {
+func QueryConstraintColumns(
+	ctx context.Context, exec Executor,
+	tableNames []string, constraintNames []string,
+) ([]ConstraintColumn, error) {
 	return QueryAll(
 		ctx, exec, queryConstraintColumnsSQL,
 		func(scan pgx.Rows, v *ConstraintColumn) error {

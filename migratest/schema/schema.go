@@ -2,6 +2,7 @@ package schema
 
 // Identifier описывает имя элемента, находящегося в указанной схеме
 type Identifier struct {
+	// TODO использовать OID
 	Schema string
 	Name   string
 }
@@ -11,7 +12,6 @@ func (i Identifier) String() string { return i.Schema + "." + i.Name }
 
 // Schema отражает схему, расположенную в базе данных
 type Schema struct {
-	// TODO загрузка типов
 	Types          map[string]*DBType
 	ArrayTypes     map[string]*ArrayType
 	CompositeTypes map[string]*CompositeType
@@ -22,8 +22,6 @@ type Schema struct {
 	Constraints    map[string]*Constraint
 	// имена том же порядке что и в базе
 	TableNames []string
-	// TODO это нужно вообще?
-	ConstraintNames []string
 }
 
 // Table описывает таблицу базы данных

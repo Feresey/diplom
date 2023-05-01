@@ -1,0 +1,4 @@
+dbconn: "postgresql://postgres:postgres@localhost:5432?sslmode=disable"
+parser:
+  - pg_catalog
+  # - test

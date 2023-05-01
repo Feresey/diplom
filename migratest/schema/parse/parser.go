@@ -7,34 +7,30 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/Feresey/mtest/config"
 	"github.com/Feresey/mtest/schema"
 	"github.com/Feresey/mtest/schema/db"
 	"github.com/Feresey/mtest/schema/parse/queries"
 )
 
-// TODO
-type ParserConfig struct {
-	Schemas []string
-}
-
 type Parser struct {
-	db  *db.DBConn
-	log *zap.Logger
+	conn *db.DBConn
+	log  *zap.Logger
 }
 
 func NewParser(
-	db *db.DBConn,
+	conn *db.DBConn,
 	log *zap.Logger,
 ) *Parser {
 	return &Parser{
-		log: log.Named("parser"),
-		db:  db,
+		log:  log.Named("parser"),
+		conn: conn,
 	}
 }
 
 // TODO вернуть ошибку если данные ссылаются на не указанную схему
 // TODO как ограничивать внутри схемы таблицы, которые будут обрабатываться? Или на этом этапе это неважно?
-func (p *Parser) LoadSchema(ctx context.Context, schemas []string) (*schema.Schema, error) {
+func (p *Parser) LoadSchema(ctx context.Context, conf config.Parser) (*schema.Schema, error) {
 	s := &schema.Schema{
 		Types:          make(map[string]*schema.DBType),
 		ArrayTypes:     make(map[string]*schema.ArrayType),
@@ -46,34 +42,37 @@ func (p *Parser) LoadSchema(ctx context.Context, schemas []string) (*schema.Sche
 		Constraints:    make(map[string]*schema.Constraint),
 	}
 
-	if err := p.LoadTables(ctx, s, schemas); err != nil {
+	if err := p.LoadTables(ctx, s, conf); err != nil {
 		return nil, fmt.Errorf("load tables: %w", err)
 	}
 	if err := p.LoadTablesColumns(ctx, s); err != nil {
 		return nil, fmt.Errorf("load tables columns: %w", err)
 	}
 	if err := p.LoadConstraints(ctx, s); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load constraints: %w", err)
 	}
-	if err := p.LoadConstraintsColumns(ctx, s); err != nil {
-		return nil, err
+
+	constraintNames := mapKeys(s.Constraints)
+	if err := p.LoadConstraintsColumns(ctx, s, constraintNames); err != nil {
+		return nil, fmt.Errorf("load constraints columns: %w", err)
 	}
-	if err := p.LoadForeignConstraints(ctx, s); err != nil {
-		return nil, err
+	if err := p.LoadForeignConstraints(ctx, s, constraintNames); err != nil {
+		return nil, fmt.Errorf("load foreign constraints: %w", err)
 	}
 
 	if err := p.LoadTypes(ctx, s); err != nil {
 		return nil, fmt.Errorf("load types: %w", err)
 	}
 	if err := p.LoadEnums(ctx, s); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load enums: %w", err)
 	}
+	// TODO load other types
 	return s, nil
 }
 
 // LoadTables получает имена таблиц, найденных в схемах
-func (p *Parser) LoadTables(ctx context.Context, s *schema.Schema, schemas []string) error {
-	tables, err := queries.QueryTables(ctx, p.db.Conn, schemas)
+func (p *Parser) LoadTables(ctx context.Context, s *schema.Schema, c config.Parser) error {
+	tables, err := queries.QueryTables(ctx, p.conn.Conn, c)
 	if err != nil {
 		p.log.Error("failed to query tables", zap.Error(err))
 		return err
@@ -97,7 +96,6 @@ func (p *Parser) LoadTables(ctx context.Context, s *schema.Schema, schemas []str
 
 		s.Tables[table.Name.String()] = table
 		s.TableNames = append(s.TableNames, table.Name.String())
-		// FIXME
 		if len(s.Tables) != len(s.TableNames) {
 			return fmt.Errorf("duplicated tables")
 		}
@@ -108,14 +106,15 @@ func (p *Parser) LoadTables(ctx context.Context, s *schema.Schema, schemas []str
 
 // LoadTablesColumns загружает колонки таблиц, включая типы и аттрибуты
 func (p *Parser) LoadTablesColumns(ctx context.Context, s *schema.Schema) error {
-	columns, err := queries.QueryColumns(ctx, p.db.Conn, s.TableNames)
+	columns, err := queries.QueryColumns(ctx, p.conn.Conn, s.TableNames)
 	if err != nil {
 		p.log.Error("failed to query tables columns", zap.Error(err))
 		return err
 	}
 	p.log.Debug("columns loaded", zap.Reflect("columns", columns))
 
-	for _, dbcolumn := range columns {
+	for idx := range columns {
+		dbcolumn := &columns[idx]
 		tableName := schema.Identifier{
 			Schema: dbcolumn.SchemaName,
 			Name:   dbcolumn.TableName,
@@ -157,7 +156,6 @@ func (p *Parser) LoadTablesColumns(ctx context.Context, s *schema.Schema) error 
 
 		table.Columns[column.Name] = column
 		table.ColumnNames = append(table.ColumnNames, column.Name)
-		// FIXME
 		if len(table.Columns) != len(table.ColumnNames) {
 			return fmt.Errorf("duplicated columns")
 		}
@@ -178,7 +176,7 @@ var pgConstraintType = map[string]schema.ConstraintType{
 
 // LoadConstraints загружает ограничения для всех найденных таблиц
 func (p *Parser) LoadConstraints(ctx context.Context, s *schema.Schema) error {
-	constraints, err := queries.QueryTableConstraints(ctx, p.db.Conn, s.TableNames)
+	constraints, err := queries.QueryTableConstraints(ctx, p.conn.Conn, s.TableNames)
 	if err != nil {
 		p.log.Error("failed to query tables constraints", zap.Error(err))
 		return err
@@ -187,7 +185,6 @@ func (p *Parser) LoadConstraints(ctx context.Context, s *schema.Schema) error {
 
 	// realloc
 	s.Constraints = make(map[string]*schema.Constraint, len(constraints))
-	s.ConstraintNames = make([]string, 0, len(constraints))
 	for _, dbconstraint := range constraints {
 		tableName := schema.Identifier{
 			Schema: dbconstraint.TableSchema,
@@ -217,18 +214,13 @@ func (p *Parser) LoadConstraints(ctx context.Context, s *schema.Schema) error {
 
 		s.Constraints[c.Name.String()] = c
 		table.Constraints[c.Name.String()] = c
-		s.ConstraintNames = append(s.ConstraintNames, c.Name.String())
-		// FIXME
-		if len(s.Constraints) != len(s.ConstraintNames) {
-			return fmt.Errorf("duplicated constraints")
-		}
 
-		// TODO это точно должно быть здесь?
 		switch c.Type {
 		case schema.ConstraintTypePK:
+			// PRIMARY KEY всегда один
 			table.PrimaryKey = c
 		case schema.ConstraintTypeFK:
-			// для FK запрос отдаёт таблицу, на которую этот FK ссылается
+			// TODO это точно должно быть здесь?
 			table.ReferencedBy[c.Name.String()] = c
 		}
 	}
@@ -236,13 +228,13 @@ func (p *Parser) LoadConstraints(ctx context.Context, s *schema.Schema) error {
 	return nil
 }
 
-func (p *Parser) LoadConstraintsColumns(ctx context.Context, s *schema.Schema) error {
-	constraintsColumns, err := queries.QueryConstraintColumns(ctx, p.db.Conn, s.TableNames, s.ConstraintNames)
+func (p *Parser) LoadConstraintsColumns(ctx context.Context, s *schema.Schema, constraintNames []string) error {
+	constraintsColumns, err := queries.QueryConstraintColumns(ctx, p.conn.Conn, s.TableNames, constraintNames)
 	if err != nil {
 		p.log.Error("failed to query constraints columns", zap.Error(err))
 		return err
 	}
-	// TODO debug log
+	p.log.Debug("load constraints columns", zap.Reflect("constraints_columns", constraintsColumns))
 
 	for _, dbc := range constraintsColumns {
 		constraintName := schema.Identifier{
@@ -277,8 +269,8 @@ func (p *Parser) LoadConstraintsColumns(ctx context.Context, s *schema.Schema) e
 	return nil
 }
 
-func (p *Parser) LoadForeignConstraints(ctx context.Context, s *schema.Schema) error {
-	fks, err := queries.QueryForeignKeys(ctx, p.db.Conn, s.ConstraintNames)
+func (p *Parser) LoadForeignConstraints(ctx context.Context, s *schema.Schema, constraintNames []string) error {
+	fks, err := queries.QueryForeignKeys(ctx, p.conn.Conn, constraintNames)
 	if err != nil {
 		p.log.Error("failed to query foreign constraints", zap.Error(err))
 		return err
@@ -334,7 +326,7 @@ func (p *Parser) loadTypes(
 	s *schema.Schema,
 	typeNames []string,
 ) (moreTypes []string, err error) {
-	types, err := queries.QueryTypes(ctx, p.db.Conn, typeNames)
+	types, err := queries.QueryTypes(ctx, p.conn.Conn, typeNames)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +335,8 @@ func (p *Parser) loadTypes(
 		zap.Reflect("types", types),
 	)
 
-	for _, dbtype := range types {
+	for idx := range types {
+		dbtype := &types[idx]
 		typeName := schema.Identifier{
 			Schema: dbtype.SchemaName,
 			Name:   dbtype.TypeName,
@@ -371,7 +364,6 @@ var pgTypType = map[string]schema.DataType{
 	"d": schema.DataTypeDomain,
 	"e": schema.DataTypeEnum,
 	"r": schema.DataTypeRange,
-	// TODO что с ними делать???
 	"m": schema.DataTypeMultiRange,
 	"p": schema.DataTypePseudo,
 }
@@ -379,7 +371,7 @@ var pgTypType = map[string]schema.DataType{
 func (p *Parser) fillType(
 	s *schema.Schema,
 	typ *schema.DBType,
-	dbtype queries.Type,
+	dbtype *queries.Type,
 ) (moreTypes []string, err error) {
 	typType, ok := pgTypType[dbtype.TypeType]
 	if !ok {
@@ -395,71 +387,36 @@ func (p *Parser) fillType(
 		zap.Stringer("typ", typType),
 	)
 
-	switch typType {
+	switch typ.Type {
 	default:
-		return nil, fmt.Errorf("data type is undefined: %s", typType)
+		return nil, fmt.Errorf("data type is undefined: %s", typ.Type)
 	case schema.DataTypeBase:
 	// TODO тут вроде ничего не надо делать, базовый же тип
 	case schema.DataTypeMultiRange:
-	// TODO
+	// TODO что мне делать с multirange типом? где он вообще может использоваться?
 	case schema.DataTypePseudo:
-	// TODO
+	// TODO что мне делать с pseudo типом? где он вообще может использоваться?
 	case schema.DataTypeDomain:
-		needLoad, domain, err := p.makeDomainType(s, typ.TypeName, dbtype)
-		if err != nil {
-			return nil, err
-		}
-		typ.DomainType = domain
-		if needLoad != nil {
-			moreTypes = append(moreTypes, needLoad.String())
-		}
+		moreTypes, typ.DomainType, err = p.makeDomainType(s, typ.TypeName, dbtype)
 	case schema.DataTypeArray:
-		needLoad, array, err := p.makeArrayType(s, typ.TypeName, dbtype)
-		if err != nil {
-			return nil, err
-		}
-		typ.ArrayType = array
-		if needLoad != nil {
-			moreTypes = append(moreTypes, needLoad.String())
-		}
+		moreTypes, typ.ArrayType, err = p.makeArrayType(s, typ.TypeName, dbtype)
 	case schema.DataTypeEnum:
-		enum, err := p.makeEnumType(s, typ.TypeName, dbtype)
-		if err != nil {
-			return nil, err
-		}
-		typ.EnumType = enum
+		typ.EnumType, err = p.makeEnumType(s, typ.TypeName)
 	case schema.DataTypeRange:
-		needLoad, rng, err := p.makeRangeType(s, typ.TypeName, dbtype)
-		if err != nil {
-			return nil, err
-		}
-		typ.RangeType = rng
-		p.log.Debug("make range type",
-			zap.Stringer("type", typ.TypeName),
-			zap.Stringer("range", rng.ElemType.TypeName),
-		)
-		if needLoad != nil {
-			moreTypes = append(moreTypes, needLoad.String())
-		}
+		moreTypes, typ.RangeType, err = p.makeRangeType(s, typ.TypeName, dbtype)
 	case schema.DataTypeComposite:
-		composite, err := p.makeCompositeType(s, typ.TypeName, dbtype)
-		if err != nil {
-			return nil, err
-		}
-		typ.CompositeType = composite
+		typ.CompositeType, err = p.makeCompositeType(s, typ.TypeName)
 	}
-
-	return moreTypes, nil
+	return moreTypes, err
 }
 
 func (p *Parser) makeDomainType(
 	s *schema.Schema,
 	domainTypeName schema.Identifier,
-	dbtype queries.Type,
-) (needLoad *schema.Identifier, domain *schema.DomainType, err error) {
+	dbtype *queries.Type,
+) (needLoad []string, domain *schema.DomainType, err error) {
 	domain, ok := s.DomainTypes[domainTypeName.String()]
 	if ok {
-		// TODO это правильно?
 		return nil, nil, fmt.Errorf("duplicate domain type: %q", domainTypeName)
 	}
 	defer func() {
@@ -477,7 +434,7 @@ func (p *Parser) makeDomainType(
 			TypeName: elemTypeName,
 		}
 		s.Types[elemTypeName.String()] = elemType
-		needLoad = &elemTypeName
+		needLoad = append(needLoad, elemTypeName.String())
 	}
 
 	domain = &schema.DomainType{
@@ -494,14 +451,14 @@ func (p *Parser) makeDomainType(
 	return needLoad, domain, nil
 }
 
+//nolint:dupl // fp
 func (p *Parser) makeArrayType(
 	s *schema.Schema,
 	arrayTypeName schema.Identifier,
-	dbtype queries.Type,
-) (needLoad *schema.Identifier, array *schema.ArrayType, err error) {
+	dbtype *queries.Type,
+) (needLoad []string, array *schema.ArrayType, err error) {
 	array, ok := s.ArrayTypes[arrayTypeName.String()]
 	if ok {
-		// TODO это правильно?
 		return nil, nil, fmt.Errorf("duplicate domain type: %q", arrayTypeName)
 	}
 	defer func() {
@@ -519,7 +476,7 @@ func (p *Parser) makeArrayType(
 			TypeName: elemTypeName,
 		}
 		s.Types[elemTypeName.String()] = elemType
-		needLoad = &elemTypeName
+		needLoad = append(needLoad, elemTypeName.String())
 	}
 
 	array = &schema.ArrayType{
@@ -533,11 +490,9 @@ func (p *Parser) makeArrayType(
 func (p *Parser) makeEnumType(
 	s *schema.Schema,
 	enumTypeName schema.Identifier,
-	dbtype queries.Type,
 ) (enum *schema.EnumType, err error) {
 	enum, ok := s.EnumTypes[enumTypeName.String()]
 	if ok {
-		// TODO это правильно?
 		return nil, fmt.Errorf("duplicate domain type: %q", enumTypeName)
 	}
 	defer func() {
@@ -549,14 +504,14 @@ func (p *Parser) makeEnumType(
 	}, nil
 }
 
+//nolint:dupl // fp
 func (p *Parser) makeRangeType(
 	s *schema.Schema,
 	rangeTypeName schema.Identifier,
-	dbtype queries.Type,
-) (needLoad *schema.Identifier, rng *schema.RangeType, err error) {
+	dbtype *queries.Type,
+) (needLoad []string, rng *schema.RangeType, err error) {
 	rng, ok := s.RangeTypes[rangeTypeName.String()]
 	if ok {
-		// TODO это правильно?
 		return nil, nil, fmt.Errorf("duplicate domain type: %q", rangeTypeName)
 	}
 	defer func() {
@@ -573,7 +528,7 @@ func (p *Parser) makeRangeType(
 			TypeName: elemTypeName,
 		}
 		s.Types[elemTypeName.String()] = elemType
-		needLoad = &elemTypeName
+		needLoad = append(needLoad, elemTypeName.String())
 	}
 
 	rng = &schema.RangeType{
@@ -587,11 +542,9 @@ func (p *Parser) makeRangeType(
 func (p *Parser) makeCompositeType(
 	s *schema.Schema,
 	compositeTypeName schema.Identifier,
-	dbtype queries.Type,
 ) (composite *schema.CompositeType, err error) {
 	composite, ok := s.CompositeTypes[compositeTypeName.String()]
 	if ok {
-		// TODO это правильно?
 		return nil, fmt.Errorf("duplicate domain type: %q", compositeTypeName)
 	}
 	defer func() {
@@ -600,13 +553,13 @@ func (p *Parser) makeCompositeType(
 
 	return &schema.CompositeType{
 		TypeName: compositeTypeName,
-		// TODO а чо мне делать с композитами?
+		// TODO а что мне делать с композитами?
 		Attributes: make(map[string]*schema.CompositeAttribute),
 	}, nil
 }
 
 func (p *Parser) LoadEnums(ctx context.Context, s *schema.Schema) error {
-	enums, err := queries.QueryEnums(ctx, p.db.Conn, mapKeys(s.EnumTypes))
+	enums, err := queries.QueryEnums(ctx, p.conn.Conn, mapKeys(s.EnumTypes))
 	if err != nil {
 		p.log.Error("failed to query enums", zap.Error(err))
 		return err
