@@ -127,7 +127,7 @@ func main() {
 }
 
 func launch(ctx context.Context, log *zap.Logger, parser *parse.Parser) error {
-	s, err := parser.LoadSchema(ctx, []string{"test"})
+	s, err := parser.LoadSchema(ctx, []string{"pg_catalog"})
 	if err != nil {
 		prettyErr, ok := err.(interface{ Pretty() string })
 		if ok {

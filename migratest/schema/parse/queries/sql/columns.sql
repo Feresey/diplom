@@ -1,10 +1,12 @@
 SELECT
+	-- column
 	ns_table.nspname AS schema_name,
 	pc_table.relname AS table_name,
 	a.attname        AS column_name,
+	-- type
 	ns_type.nspname  AS type_schema,
 	t.typname        AS type_name,
-	t.typtype::TEXT  AS type_type,
+	-- attributes
 	a.attnotnull     AS is_nullable,
 	a.atthasdef      AS has_default,
 	a.attndims       AS array_dims,

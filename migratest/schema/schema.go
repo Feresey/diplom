@@ -74,13 +74,15 @@ type Column struct {
 type DataType int
 
 const (
-	DataTypeUndefined DataType = iota
-	DataTypeBase               // встроенные базовые типы. INT, BOOL, DATE, TEXT, INET, CIDR
-	DataTypeArray              // массивы. INT[]
-	DataTypeEnum               // Enum тип.
-	DataTypeRange              // Тип-диапазон. INT4RANGE
-	DataTypeComposite          // Тип-структура.
-	DataTypeDomain             // Домен. Основан на любом другом типе и включает в себя ограничения для него
+	DataTypeUndefined  DataType = iota
+	DataTypeBase                // встроенные базовые типы. INT, BOOL, DATE, TEXT, INET, CIDR
+	DataTypeArray               // массивы. INT[]
+	DataTypeEnum                // Enum тип.
+	DataTypeRange               // Тип-диапазон. INT4RANGE
+	DataTypeMultiRange          // Множество диапазонов. Создается автоматически при создании RANGE типа. INT4MULTIRANGE
+	DataTypeComposite           // Тип-структура.
+	DataTypeDomain              // Домен. Основан на любом другом типе и включает в себя ограничения для него
+	DataTypePseudo              // Домен. Основан на любом другом типе и включает в себя ограничения для него
 )
 
 // DBType описывает тип данных базы

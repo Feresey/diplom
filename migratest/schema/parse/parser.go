@@ -106,17 +106,6 @@ func (p *Parser) LoadTables(ctx context.Context, s *schema.Schema, schemas []str
 	return nil
 }
 
-// перевод значений колонки pg_type.typtype
-var pgTypType = map[string]schema.DataType{
-	"b": schema.DataTypeBase,
-	"c": schema.DataTypeComposite,
-	"d": schema.DataTypeDomain,
-	"e": schema.DataTypeEnum,
-	"r": schema.DataTypeRange,
-	// TODO что с ним делать???
-	"m": schema.DataTypeRange,
-}
-
 // LoadTablesColumns загружает колонки таблиц, включая типы и аттрибуты
 func (p *Parser) LoadTablesColumns(ctx context.Context, s *schema.Schema) error {
 	columns, err := queries.QueryColumns(ctx, p.db.Conn, s.TableNames)
@@ -143,14 +132,8 @@ func (p *Parser) LoadTablesColumns(ctx context.Context, s *schema.Schema) error 
 
 		typ, ok := s.Types[typeName.String()]
 		if !ok {
-			typeType, ok := pgTypType[dbcolumn.TypeType]
-			if !ok {
-				return fmt.Errorf("type value is undefined: %q", dbcolumn.TypeType)
-			}
-
 			typ = &schema.DBType{
 				TypeName: typeName,
-				Type:     typeType,
 			}
 			p.log.Debug("add type", zap.Stringer("type", typ.TypeName))
 			s.Types[typeName.String()] = typ
@@ -381,6 +364,18 @@ func (p *Parser) loadTypes(
 	return moreTypes, nil
 }
 
+// перевод значений колонки pg_type.typtype
+var pgTypType = map[string]schema.DataType{
+	"b": schema.DataTypeBase,
+	"c": schema.DataTypeComposite,
+	"d": schema.DataTypeDomain,
+	"e": schema.DataTypeEnum,
+	"r": schema.DataTypeRange,
+	// TODO что с ними делать???
+	"m": schema.DataTypeMultiRange,
+	"p": schema.DataTypePseudo,
+}
+
 func (p *Parser) fillType(
 	s *schema.Schema,
 	typ *schema.DBType,
@@ -402,8 +397,13 @@ func (p *Parser) fillType(
 
 	switch typType {
 	default:
-		return nil, fmt.Errorf("data type is undefined: %+#v", typ)
+		return nil, fmt.Errorf("data type is undefined: %s", typType)
 	case schema.DataTypeBase:
+	// TODO тут вроде ничего не надо делать, базовый же тип
+	case schema.DataTypeMultiRange:
+	// TODO
+	case schema.DataTypePseudo:
+	// TODO
 	case schema.DataTypeDomain:
 		needLoad, domain, err := p.makeDomainType(s, typ.TypeName, dbtype)
 		if err != nil {

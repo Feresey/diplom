@@ -31,12 +31,13 @@ func QueryTables(ctx context.Context, exec Executor, schemas []string) ([]Tables
 var queryColumnsSQL string
 
 type Column struct {
-	SchemaName         string
-	TableName          string
-	ColumnName         string
-	TypeSchema         string
-	TypeName           string
-	TypeType           string
+	SchemaName string
+	TableName  string
+	ColumnName string
+
+	TypeSchema string
+	TypeName   string
+
 	IsNullable         bool
 	HasDefault         bool
 	ArrayDims          int
@@ -53,9 +54,10 @@ func QueryColumns(ctx context.Context, exec Executor, tableNames []string) ([]Co
 				&v.SchemaName,
 				&v.TableName,
 				&v.ColumnName,
+
 				&v.TypeSchema,
 				&v.TypeName,
-				&v.TypeType,
+
 				&v.IsNullable,
 				&v.HasDefault,
 				&v.ArrayDims,
