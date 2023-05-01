@@ -146,9 +146,8 @@ func (p *Parser) LoadTablesColumns(ctx context.Context, s *schema.Schema) error 
 				HasDefault: dbcolumn.HasDefault || dbcolumn.IsGenerated,
 				Default:    dbcolumn.DefaultExpr.String,
 				DomainAttributes: schema.DomainAttributes{
-					NotNullable:   dbcolumn.IsNullable,
-					CharMaxLength: dbcolumn.CharacterMaxLength.Int,
-					// TODO как определить для VARCHAR(100)[]?
+					NotNullable:      dbcolumn.IsNullable,
+					CharMaxLength:    dbcolumn.CharacterMaxLength.Int,
 					HasCharMaxLength: dbcolumn.CharacterMaxLength.Valid,
 					ArrayDims:        dbcolumn.ArrayDims,
 				},
@@ -221,7 +220,6 @@ func (p *Parser) LoadConstraints(ctx context.Context, s *schema.Schema) error {
 			// PRIMARY KEY всегда один
 			table.PrimaryKey = c
 		case schema.ConstraintTypeFK:
-			// TODO это точно должно быть здесь?
 			table.ReferencedBy[c.Name.String()] = c
 		}
 	}

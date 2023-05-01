@@ -12,9 +12,15 @@ SELECT
 	a.attndims       AS array_dims,
 	a.attgenerated = 's' AS is_generated,
 	pg_get_expr(ad.adbin, ad.adrelid) AS default_expr,
-	information_schema._pg_char_max_length(
-		information_schema._pg_truetypid(a.*, t.*),
-		information_schema._pg_truetypmod(a.*, t.*)
+	COALESCE(
+		information_schema._pg_char_max_length(
+			information_schema._pg_truetypid(a.*, t.*),
+			information_schema._pg_truetypmod(a.*, t.*)
+		),
+		information_schema._pg_char_max_length(
+			elem_t.oid,
+			a.atttypmod
+		)
 	)::INT AS character_max_length
 FROM
 	pg_attribute a
@@ -22,6 +28,7 @@ FROM
 	JOIN pg_namespace ns_table ON pc_table.relnamespace = ns_table.oid
 	JOIN pg_type t ON a.atttypid = t.oid
 	JOIN pg_namespace ns_type ON t.typnamespace = ns_type.oid
+	LEFT JOIN pg_type elem_t ON elem_t.oid = t.typelem
 	LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
 WHERE
 	attnum > 0
