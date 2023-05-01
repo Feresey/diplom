@@ -15,9 +15,9 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/Feresey/mtest/config"
+	"github.com/Feresey/mtest/db"
+	"github.com/Feresey/mtest/parse"
 	"github.com/Feresey/mtest/schema"
-	"github.com/Feresey/mtest/schema/db"
-	"github.com/Feresey/mtest/schema/parse"
 )
 
 func newLogger(flags *config.Flags) *zap.Logger {

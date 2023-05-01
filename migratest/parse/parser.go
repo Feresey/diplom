@@ -8,9 +8,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/Feresey/mtest/config"
+	"github.com/Feresey/mtest/db"
+	"github.com/Feresey/mtest/parse/queries"
 	"github.com/Feresey/mtest/schema"
-	"github.com/Feresey/mtest/schema/db"
-	"github.com/Feresey/mtest/schema/parse/queries"
 )
 
 type Parser struct {
