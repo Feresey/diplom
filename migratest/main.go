@@ -2,51 +2,33 @@ package main
 
 import (
 	"context"
-	"flag"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/yaml.v3"
 
-	"github.com/Feresey/mtest/config"
 	"github.com/Feresey/mtest/db"
 	"github.com/Feresey/mtest/parse"
-	"github.com/Feresey/mtest/schema"
+	"github.com/urfave/cli/v2"
 )
 
-func newLogger(flags *config.Flags) *zap.Logger {
+func newLogger(debug bool) (*zap.Logger, error) {
 	lc := zap.NewDevelopmentConfig()
 	lc.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	lc.DisableStacktrace = true
-	if flags.Debug {
+	if debug {
 		lc.Level.SetLevel(zap.DebugLevel)
 	} else {
 		lc.Level.SetLevel(zap.InfoLevel)
 	}
-	log, err := lc.Build()
-	if err != nil {
-		println("failed to build zap logger: ", err)
-		os.Exit(1)
-	}
-
-	return log
-}
-
-func readConfig(confPath string) (config.FileConfig, error) {
-	var fc config.FileConfig
-	file, err := os.ReadFile(confPath)
-	if err != nil {
-		return fc, err
-	}
-
-	err = yaml.Unmarshal(file, &fc)
-	return fc, err
+	return lc.Build()
 }
 
 type ErrorHandler struct {
@@ -62,22 +44,73 @@ func (e ErrorHandler) HandleError(err error) {
 	}
 }
 
-func NewApp(populate fx.Option) *fx.App {
-	flags := config.NewFlags()
-	flag.Parse()
+type flags struct {
+	Config       *cli.StringFlag
+	Debug        *cli.BoolFlag
+	StartTimeout *cli.DurationFlag
+	StopTimeout  *cli.DurationFlag
+}
 
-	log := newLogger(flags)
-	cnf, err := readConfig(flags.Config)
-	if err != nil {
-		println("Failed to read config", err.Error())
-		os.Exit(2)
+func (f *flags) Set() []cli.Flag {
+	return []cli.Flag{
+		f.Config,
+		f.Debug,
+		f.StartTimeout,
+		f.StopTimeout,
+	}
+}
+
+func main() {
+	f := flags{
+		Config: &cli.StringFlag{
+			Name:      "config",
+			Value:     "mtest.yml",
+			Usage:     "config file path",
+			TakesFile: true,
+			Aliases:   []string{"c"},
+		},
+		Debug: &cli.BoolFlag{
+			Name:   "debug",
+			Value:  false,
+			Usage:  "show debug information",
+			Hidden: true,
+		},
+		StartTimeout: &cli.DurationFlag{
+			Name:  "start-timeout",
+			Value: 5 * time.Second,
+		},
+		StopTimeout: &cli.DurationFlag{
+			Name:  "stop-timeout",
+			Value: 5 * time.Second,
+		},
 	}
 
+	app := &cli.App{
+		Name:        "mtest",
+		Description: "migration test tool",
+		Flags:       f.Set(),
+		Commands: []*cli.Command{
+			DumpCommand(f),
+		},
+	}
+	err := app.Run(os.Args)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
+func NewApp(
+	ctx *cli.Context,
+	log *zap.Logger,
+	cnf FxConfig,
+	f flags,
+	populate fx.Option,
+) *fx.App {
 	return fx.New(
 		fx.Supply(
 			log,
 			cnf,
-			flags,
 		),
 		fx.WithLogger(func(logger *zap.Logger) fxevent.Logger {
 			l := &fxevent.ZapLogger{Logger: logger}
@@ -86,30 +119,21 @@ func NewApp(populate fx.Option) *fx.App {
 			return l
 		}),
 		fx.Provide(
-			config.NewConfig,
 			db.NewDB,
 			parse.NewParser,
 		),
-		fx.StartTimeout(flags.StartTimeout),
-		fx.StopTimeout(flags.StopTimeout),
+		fx.StartTimeout(f.StartTimeout.Get(ctx)),
+		fx.StopTimeout(f.StopTimeout.Get(ctx)),
 		fx.ErrorHook(ErrorHandler{
 			log:   log,
-			debug: flags.Debug,
+			debug: f.Debug.Get(ctx),
 		}),
 
 		populate,
 	)
 }
 
-func main() {
-	var (
-		log          *zap.Logger
-		parser       *parse.Parser
-		parserConfig config.Parser
-	)
-
-	app := NewApp(fx.Populate(&log, &parser, &parserConfig))
-
+func RunApp(app *fx.App, log *zap.Logger, run func(ctx context.Context) error) (runErr error) {
 	runCtx, cancel := context.WithCancel(context.Background())
 	go func() {
 		<-app.Done()
@@ -118,8 +142,7 @@ func main() {
 
 	err := app.Start(runCtx)
 	if err != nil {
-		println("failed to start app", err.Error())
-		os.Exit(1)
+		return fmt.Errorf("start app: %w", err)
 	}
 	log.Debug("app started")
 
@@ -129,53 +152,10 @@ func main() {
 
 		err = app.Stop(stopCtx)
 		if err != nil {
-			log.Fatal("stop app", zap.Error(err))
+			runErr = errors.Join(runErr, err)
 		}
 		log.Debug("app stopped gracefullty")
 	}()
 
-	// TODO добавить команды (schema, generate, ...)
-	if err := launch(runCtx, log, parser, parserConfig); err != nil {
-		if err != nil {
-			log.Error("launch app", zap.Error(err))
-		}
-	}
-}
-
-func launch(
-	ctx context.Context,
-	log *zap.Logger,
-	parser *parse.Parser,
-	pc config.Parser,
-) error {
-	s, err := parser.LoadSchema(ctx, pc)
-	if err != nil {
-		prettyErr, ok := err.(interface{ Pretty() string })
-		if ok {
-			log.Error(prettyErr.Pretty())
-			// TODO экзит коды
-			return nil
-		}
-
-		return fmt.Errorf("error loading schema: %w", err)
-	}
-
-	grapth := schema.NewGrapth(s)
-
-	log.Info("dump schema")
-	if err := grapth.Dump(os.Stdout, schema.DumpSchemaTemplate); err != nil {
-		return fmt.Errorf("failed to dump schema: %w", err)
-	}
-
-	log.Info("dump types")
-	if err := grapth.Dump(os.Stdout, schema.DumpTypesTemplate); err != nil {
-		return fmt.Errorf("failed to dump types: %w", err)
-	}
-
-	log.Info("dump grapth")
-	if err := grapth.Dump(os.Stdout, schema.DumpGrapthTemplate); err != nil {
-		return fmt.Errorf("failed to dump grapth: %w", err)
-	}
-
-	return nil
+	return run(runCtx)
 }

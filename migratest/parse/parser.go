@@ -7,19 +7,27 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/Feresey/mtest/config"
 	"github.com/Feresey/mtest/db"
 	"github.com/Feresey/mtest/parse/queries"
 	"github.com/Feresey/mtest/schema"
 )
 
+type Config struct {
+	Patterns []Pattern
+}
+
+type Pattern struct {
+	Schema string
+	Tables string
+}
+
 type Parser struct {
-	conn *db.DBConn
+	conn *db.Conn
 	log  *zap.Logger
 }
 
 func NewParser(
-	conn *db.DBConn,
+	conn *db.Conn,
 	log *zap.Logger,
 ) *Parser {
 	return &Parser{
@@ -30,7 +38,7 @@ func NewParser(
 
 // TODO вернуть ошибку если данные ссылаются на не указанную схему
 // TODO как ограничивать внутри схемы таблицы, которые будут обрабатываться? Или на этом этапе это неважно?
-func (p *Parser) LoadSchema(ctx context.Context, conf config.Parser) (*schema.Schema, error) {
+func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, error) {
 	s := &schema.Schema{
 		Types:          make(map[string]*schema.DBType),
 		ArrayTypes:     make(map[string]*schema.ArrayType),
@@ -42,7 +50,12 @@ func (p *Parser) LoadSchema(ctx context.Context, conf config.Parser) (*schema.Sc
 		Constraints:    make(map[string]*schema.Constraint),
 	}
 
-	if err := p.LoadTables(ctx, s, conf); err != nil {
+	patterns := make([]queries.TablesPattern, 0, len(conf.Patterns))
+	for _, p := range conf.Patterns {
+		patterns = append(patterns, queries.TablesPattern(p))
+	}
+
+	if err := p.LoadTables(ctx, s, patterns...); err != nil {
 		return nil, fmt.Errorf("load tables: %w", err)
 	}
 	if err := p.LoadTablesColumns(ctx, s); err != nil {
@@ -70,8 +83,8 @@ func (p *Parser) LoadSchema(ctx context.Context, conf config.Parser) (*schema.Sc
 }
 
 // LoadTables получает имена таблиц, найденных в схемах
-func (p *Parser) LoadTables(ctx context.Context, s *schema.Schema, c config.Parser) error {
-	tables, err := queries.QueryTables(ctx, p.conn.Conn, c)
+func (p *Parser) LoadTables(ctx context.Context, s *schema.Schema, patterns ...queries.TablesPattern) error {
+	tables, err := queries.QueryTables(ctx, p.conn.Conn, patterns...)
 	if err != nil {
 		p.log.Error("failed to query tables", zap.Error(err))
 		return err
@@ -110,7 +123,7 @@ func (p *Parser) LoadTablesColumns(ctx context.Context, s *schema.Schema) error 
 		p.log.Error("failed to query tables columns", zap.Error(err))
 		return err
 	}
-	p.log.Debug("columns loaded", zap.Reflect("columns", columns))
+	p.log.Debug("columns loaded", zap.Int("n", len(columns)))
 
 	for idx := range columns {
 		dbcolumn := &columns[idx]
@@ -180,7 +193,7 @@ func (p *Parser) LoadConstraints(ctx context.Context, s *schema.Schema) error {
 		p.log.Error("failed to query tables constraints", zap.Error(err))
 		return err
 	}
-	p.log.Debug("loaded constraints", zap.Reflect("constraints", constraints))
+	p.log.Debug("loaded constraints", zap.Int("n", len(constraints)))
 
 	// realloc
 	s.Constraints = make(map[string]*schema.Constraint, len(constraints))
@@ -232,7 +245,7 @@ func (p *Parser) LoadConstraintsColumns(ctx context.Context, s *schema.Schema, c
 		p.log.Error("failed to query constraints columns", zap.Error(err))
 		return err
 	}
-	p.log.Debug("load constraints columns", zap.Reflect("constraints_columns", constraintsColumns))
+	p.log.Debug("load constraints columns", zap.Int("n", len(constraintsColumns)))
 
 	for _, dbc := range constraintsColumns {
 		constraintName := schema.Identifier{
@@ -328,9 +341,8 @@ func (p *Parser) loadTypes(
 	if err != nil {
 		return nil, err
 	}
-	p.log.Debug("load types",
+	p.log.Debug("types loaded",
 		zap.Strings("type_names", typeNames),
-		zap.Reflect("types", types),
 	)
 
 	for idx := range types {

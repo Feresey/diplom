@@ -8,28 +8,30 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
-	"github.com/Feresey/mtest/config"
 )
 
-type DBConn struct {
+type Config struct {
+	Conn  string
+	Debug bool
+}
+
+type Conn struct {
 	*pgx.Conn
 }
 
 func NewDB(
 	lc fx.Lifecycle,
 	logger *zap.Logger,
-	cfg config.DBConn,
-	flags *config.Flags,
-) (*DBConn, error) {
-	var conn DBConn
+	cfg Config,
+) (*Conn, error) {
+	var conn Conn
 
-	cnf, err := pgx.ParseConfig(string(cfg))
+	cnf, err := pgx.ParseConfig(cfg.Conn)
 	if err != nil {
 		return nil, err
 	}
 
-	if flags.Debug {
+	if cfg.Debug {
 		cnf.Tracer = &tracelog.TraceLog{
 			Logger:   tracelog.LoggerFunc(queryMessageLog(logger)),
 			LogLevel: tracelog.LogLevelInfo,

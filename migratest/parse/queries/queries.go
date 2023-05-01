@@ -6,7 +6,6 @@ import (
 	_ "embed"
 	"fmt"
 
-	"github.com/Feresey/mtest/config"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -19,11 +18,16 @@ type Tables struct {
 	Table  string
 }
 
-func QueryTables(ctx context.Context, exec Executor, c config.Parser) ([]Tables, error) {
+type TablesPattern struct {
+	Schema string
+	Tables string
+}
+
+func QueryTables(ctx context.Context, exec Executor, p ...TablesPattern) ([]Tables, error) {
 	var where string
 	var paramIndex int
 	var args []any
-	for _, pattern := range c.Patterns {
+	for _, pattern := range p {
 		paramIndex++
 		args = append(args, pattern.Schema)
 		schema := fmt.Sprintf("ns.nspname LIKE $%d", paramIndex)
@@ -40,7 +44,7 @@ func QueryTables(ctx context.Context, exec Executor, c config.Parser) ([]Tables,
 	}
 
 	return QueryAll(
-		ctx, exec, queryTablesSQL+where,
+		ctx, exec, fmt.Sprintf("%s AND (%s)", queryTablesSQL, where),
 		func(scan pgx.Rows, v *Tables) error {
 			return scan.Scan(
 				&v.OID,

@@ -7,3 +7,4 @@ FROM
 	pg_class c
 	JOIN pg_namespace ns ON ns.oid = c.relnamespace
 WHERE
+	c.relkind = 'r'

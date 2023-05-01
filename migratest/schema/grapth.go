@@ -5,7 +5,7 @@ type Graph struct {
 	Grapth map[string]map[string]*Table
 }
 
-func NewGrapth(schema *Schema) *Graph {
+func NewGraph(schema *Schema) *Graph {
 	g := &Graph{
 		Schema: schema,
 	}
