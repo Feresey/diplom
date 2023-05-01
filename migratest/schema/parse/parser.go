@@ -66,7 +66,6 @@ func (p *Parser) LoadSchema(ctx context.Context, conf config.Parser) (*schema.Sc
 	if err := p.LoadEnums(ctx, s); err != nil {
 		return nil, fmt.Errorf("load enums: %w", err)
 	}
-	// TODO load other types
 	return s, nil
 }
 
@@ -147,7 +146,7 @@ func (p *Parser) LoadTablesColumns(ctx context.Context, s *schema.Schema) error 
 				Default:    dbcolumn.DefaultExpr.String,
 				DomainAttributes: schema.DomainAttributes{
 					NotNullable:      dbcolumn.IsNullable,
-					CharMaxLength:    dbcolumn.CharacterMaxLength.Int,
+					CharMaxLength:    int(dbcolumn.CharacterMaxLength.Int32),
 					HasCharMaxLength: dbcolumn.CharacterMaxLength.Valid,
 					ArrayDims:        dbcolumn.ArrayDims,
 				},
@@ -390,7 +389,6 @@ func (p *Parser) fillType(
 	default:
 		return nil, fmt.Errorf("data type is undefined: %s", typ.Type)
 	case schema.DataTypeBase:
-	// TODO тут вроде ничего не надо делать, базовый же тип
 	case schema.DataTypeMultiRange:
 	// TODO что мне делать с multirange типом? где он вообще может использоваться?
 	case schema.DataTypePseudo:
@@ -441,7 +439,7 @@ func (p *Parser) makeDomainType(
 		Attributes: schema.DomainAttributes{
 			NotNullable:      !dbtype.DomainIsNotNullable,
 			HasCharMaxLength: dbtype.DomainCharacterMaxSize.Valid,
-			CharMaxLength:    dbtype.DomainCharacterMaxSize.Int,
+			CharMaxLength:    int(dbtype.DomainCharacterMaxSize.Int32),
 			ArrayDims:        dbtype.DomainArrayDims,
 		},
 		ElemType: elemType,

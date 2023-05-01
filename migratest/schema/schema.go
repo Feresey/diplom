@@ -1,10 +1,13 @@
 package schema
 
-// Identifier описывает имя элемента, находящегося в указанной схеме
+// Identifier описывает имя элемента
 type Identifier struct {
-	// TODO использовать OID
+	// Row identifier
+	OID int
+	// Schema name
 	Schema string
-	Name   string
+	// Имя элемента
+	Name string
 }
 
 // TODO нужно ли добавлять "%s"."%s"?

@@ -2,46 +2,48 @@ package queries
 
 import (
 	"context"
+	"database/sql"
 	_ "embed"
 	"fmt"
 
 	"github.com/Feresey/mtest/config"
-	"github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5"
-	"github.com/volatiletech/null/v8"
 )
 
+//go:embed sql/tables.sql
+var queryTablesSQL string
+
 type Tables struct {
+	OID    int
 	Schema string
 	Table  string
 }
 
 func QueryTables(ctx context.Context, exec Executor, c config.Parser) ([]Tables, error) {
-	var sqlPatterns []squirrel.Sqlizer
+	var where string
+	var paramIndex int
+	var args []any
 	for _, pattern := range c.Patterns {
-		schema := squirrel.Expr("schemaname LIKE ?", pattern.Schema)
-		if pattern.Tables == "" {
-			sqlPatterns = append(sqlPatterns, schema)
+		paramIndex++
+		args = append(args, pattern.Schema)
+		schema := fmt.Sprintf("ns.nspname LIKE $%d", paramIndex)
+		if pattern.Tables != "" {
+			paramIndex++
+			args = append(args, pattern.Tables)
+			schema = fmt.Sprintf("%s AND c.relname LIKE $%d", schema, paramIndex)
 		}
-		table := squirrel.Expr("tablename LIKE ?", pattern.Tables)
 
-		sqlPatterns = append(sqlPatterns, squirrel.And([]squirrel.Sqlizer{schema, table}))
-	}
-
-	query, args, err := squirrel.Select(
-		"schemaname",
-		"tablename",
-	).From("pg_tables").
-		PlaceholderFormat(squirrel.Dollar).
-		Where(squirrel.Or(sqlPatterns)).ToSql()
-	if err != nil {
-		return nil, fmt.Errorf("build tables query: %w", err)
+		if where != "" {
+			where += " OR "
+		}
+		where += schema
 	}
 
 	return QueryAll(
-		ctx, exec, query,
+		ctx, exec, queryTablesSQL+where,
 		func(scan pgx.Rows, v *Tables) error {
 			return scan.Scan(
+				&v.OID,
 				&v.Schema,
 				&v.Table,
 			)
@@ -63,8 +65,8 @@ type Column struct {
 	HasDefault         bool
 	ArrayDims          int
 	IsGenerated        bool
-	DefaultExpr        null.String
-	CharacterMaxLength null.Int
+	DefaultExpr        sql.NullString
+	CharacterMaxLength sql.NullInt32
 }
 
 func QueryColumns(ctx context.Context, exec Executor, tableNames []string) ([]Column, error) {
@@ -185,17 +187,17 @@ type Type struct {
 	TypeName               string
 	TypeType               string
 	IsArray                bool
-	ElemTypeSchema         null.String
-	ElemTypeName           null.String
+	ElemTypeSchema         sql.NullString
+	ElemTypeName           sql.NullString
 	DomainIsNotNullable    bool
-	DomainSchema           null.String
-	DomainType             null.String
-	DomainCharacterMaxSize null.Int
+	DomainSchema           sql.NullString
+	DomainType             sql.NullString
+	DomainCharacterMaxSize sql.NullInt32
 	DomainArrayDims        int
-	RangeElementTypeSchema null.String
-	RangeElementTypeName   null.String
-	MultiRangeTypeSchema   null.String
-	MultiRangeTypeName     null.String
+	RangeElementTypeSchema sql.NullString
+	RangeElementTypeName   sql.NullString
+	MultiRangeTypeSchema   sql.NullString
+	MultiRangeTypeName     sql.NullString
 }
 
 func QueryTypes(ctx context.Context, exec Executor, typeNames []string) ([]Type, error) {

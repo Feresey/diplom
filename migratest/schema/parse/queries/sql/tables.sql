@@ -1,8 +1,9 @@
 -- list tables
 SELECT
-	schemaname,
-	tablename
+	c.oid::INT AS table_oid,
+	ns.nspname AS schema_name,
+	c.relname AS table_name
 FROM
-	pg_tables
+	pg_class c
+	JOIN pg_namespace ns ON ns.oid = c.relnamespace
 WHERE
-	schemaname = ANY($1)

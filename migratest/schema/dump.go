@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"bytes"
 	"embed"
 	"fmt"
 	"io"
@@ -77,15 +76,10 @@ func (g *Graph) Dump(w io.Writer, tplName TemplateName) error {
 		return err
 	}
 
-	var buf bytes.Buffer
-
-	err = tpl.ExecuteTemplate(&buf, string(tplName), data)
+	err = tpl.ExecuteTemplate(w, string(tplName), data)
 	if err != nil {
-		_, _ = buf.WriteTo(w)
 		return err
 	}
 
-	// TODO частичная запись это правильно?
-	_, err = buf.WriteTo(w)
 	return err
 }
