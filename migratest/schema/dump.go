@@ -11,10 +11,17 @@ import (
 	"github.com/Masterminds/sprig/v3"
 )
 
-//go:embed dump.tpl
+//go:embed templates/*.tpl
 var dumptpl embed.FS
 
-func (s *Schema) Dump(w io.Writer) error {
+type TemplateName string
+
+const (
+	DumpSchemaTemplate TemplateName = "dump-schema.tpl"
+	DumpTypesTemplate  TemplateName = "dump-types.tpl"
+)
+
+func (s *Schema) Dump(w io.Writer, tplName TemplateName) error {
 	t := template.New("").
 		Funcs(sprig.TxtFuncMap()).
 		Funcs(template.FuncMap{
@@ -30,14 +37,14 @@ func (s *Schema) Dump(w io.Writer) error {
 				return strings.Repeat(" ", maxlen-namelen)
 			},
 		})
-	tpl, err := t.ParseFS(dumptpl, "*.tpl")
+	tpl, err := t.ParseFS(dumptpl, "templates/*.tpl")
 	if err != nil {
 		return err
 	}
 
 	var buf bytes.Buffer
 
-	err = tpl.ExecuteTemplate(&buf, "dump.tpl", s)
+	err = tpl.ExecuteTemplate(&buf, string(tplName), s)
 	if err != nil {
 		_, _ = buf.WriteTo(w)
 		return err

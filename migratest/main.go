@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/Feresey/mtest/config"
+	"github.com/Feresey/mtest/schema"
 	"github.com/Feresey/mtest/schema/db"
 	"github.com/Feresey/mtest/schema/parse"
 )
@@ -138,8 +139,12 @@ func launch(ctx context.Context, log *zap.Logger, parser *parse.Parser) error {
 		return fmt.Errorf("error loading schema: %w", err)
 	}
 
-	if err := s.Dump(os.Stdout); err != nil {
+	if err := s.Dump(os.Stdout, schema.DumpSchemaTemplate); err != nil {
 		return fmt.Errorf("failed to dump schema: %w", err)
+	}
+
+	if err := s.Dump(os.Stdout, schema.DumpTypesTemplate); err != nil {
+		return fmt.Errorf("failed to dump types: %w", err)
 	}
 
 	return nil

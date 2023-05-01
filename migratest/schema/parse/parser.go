@@ -47,10 +47,10 @@ func (p *Parser) LoadSchema(ctx context.Context, schemas []string) (*schema.Sche
 	}
 
 	if err := p.LoadTables(ctx, s, schemas); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load tables: %w", err)
 	}
 	if err := p.LoadTablesColumns(ctx, s); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load tables columns: %w", err)
 	}
 	if err := p.LoadConstraints(ctx, s); err != nil {
 		return nil, err
@@ -62,6 +62,9 @@ func (p *Parser) LoadSchema(ctx context.Context, schemas []string) (*schema.Sche
 		return nil, err
 	}
 
+	if err := p.LoadTypes(ctx, s); err != nil {
+		return nil, fmt.Errorf("load types: %w", err)
+	}
 	if err := p.LoadEnums(ctx, s); err != nil {
 		return nil, err
 	}
@@ -140,7 +143,7 @@ func (p *Parser) LoadTablesColumns(ctx context.Context, s *schema.Schema) error 
 
 		typ, ok := s.Types[typeName.String()]
 		if !ok {
-			typeType, ok := pgTypType[dbcolumn.TypeName]
+			typeType, ok := pgTypType[dbcolumn.TypeType]
 			if !ok {
 				return fmt.Errorf("type value is undefined: %q", dbcolumn.TypeType)
 			}
@@ -389,113 +392,203 @@ func (p *Parser) fillType(
 
 	switch typType {
 	default:
+		return nil, fmt.Errorf("data type is undefined: %+#v", typ)
 	case schema.DataTypeBase:
 	case schema.DataTypeDomain:
-		domainTypeName := schema.Identifier{
-			Schema: dbtype.SchemaName,
-			Name:   dbtype.DomainType.String,
+		needLoad, domain, err := p.makeDomainType(s, typ.TypeName, dbtype)
+		if err != nil {
+			return nil, err
 		}
-		domain, ok := s.DomainTypes[domainTypeName.String()]
-		if ok {
-			return nil, fmt.Errorf("duplicate domain type: %q", domainTypeName)
-		}
-
-		elemTypeName := schema.Identifier{
-			Schema: dbtype.DomainSchema.String,
-			Name:   dbtype.DomainType.String,
-		}
-		elemType, ok := s.Types[elemTypeName.String()]
-		if !ok {
-			moreTypes = append(moreTypes, elemTypeName.String())
-			elemType = &schema.DBType{
-				TypeName: elemTypeName,
-			}
-			s.Types[elemTypeName.String()] = elemType
-		}
-
-		domain = &schema.DomainType{
-			TypeName: domainTypeName,
-			Attributes: schema.DomainAttributes{
-				Nullable:         !dbtype.DomainIsNotNullable,
-				HasCharMaxLength: dbtype.DomainCharacterMaxSize.Valid,
-				CharMaxLength:    dbtype.DomainCharacterMaxSize.Int,
-				ArrayDims:        domain.Attributes.ArrayDims,
-			},
-			// TODO тип элемента домена это другой тип? Или он просто имеет аттрибуты как колонка таблицы?
-			ElemType: elemType,
-		}
-		s.DomainTypes[domainTypeName.String()] = domain
 		typ.DomainType = domain
+		if needLoad != nil {
+			moreTypes = append(moreTypes, needLoad.String())
+		}
 	case schema.DataTypeArray:
-		arrTypeName := schema.Identifier{
-			Schema: dbtype.ElemTypeSchema.String,
-			Name:   dbtype.ElemTypeSchema.String,
+		needLoad, array, err := p.makeArrayType(s, typ.TypeName, dbtype)
+		if err != nil {
+			return nil, err
 		}
-		elemType, ok := s.Types[arrTypeName.String()]
-		if !ok {
-			elemType = &schema.DBType{
-				TypeName: arrTypeName,
-			}
-			s.Types[arrTypeName.String()] = elemType
+		typ.ArrayType = array
+		if needLoad != nil {
+			moreTypes = append(moreTypes, needLoad.String())
 		}
-		arr := &schema.ArrayType{
-			TypeName: arrTypeName,
-			ElemType: elemType,
-		}
-		s.ArrayTypes[arrTypeName.String()] = arr
-		typ.ArrayType = arr
 	case schema.DataTypeEnum:
-		enumName := schema.Identifier{
-			Schema: dbtype.SchemaName,
-			Name:   dbtype.TypeName,
+		enum, err := p.makeEnumType(s, typ.TypeName, dbtype)
+		if err != nil {
+			return nil, err
 		}
-		enum, ok := s.EnumTypes[enumName.String()]
-		if !ok {
-			enum = &schema.EnumType{
-				TypeName: enumName,
-				// Values: ,
-			}
-			s.EnumTypes[enumName.String()] = enum
-		}
-		enumType, ok := s.Types[enumName.String()]
-		if !ok {
-			enumType = &schema.DBType{
-				TypeName: enumName,
-				Type:     schema.DataTypeEnum,
-			}
-			s.Types[enumName.String()] = enumType
-		}
-		enumType.EnumType = enum
 		typ.EnumType = enum
 	case schema.DataTypeRange:
-		rangeName := schema.Identifier{
-			Schema: dbtype.SchemaName,
-			Name:   dbtype.TypeName,
-		}
-		rng, ok := s.RangeTypes[rangeName.String()]
-		if !ok {
-			rng = &schema.RangeType{
-				TypeName: rangeName,
-				// ElemType: ,
-			}
-			s.RangeTypes[rangeName.String()] = rng
+		needLoad, rng, err := p.makeRangeType(s, typ.TypeName, dbtype)
+		if err != nil {
+			return nil, err
 		}
 		typ.RangeType = rng
+		if needLoad != nil {
+			moreTypes = append(moreTypes, needLoad.String())
+		}
 	case schema.DataTypeComposite:
-		// TODO то есть если тип - композит, то он всегда ссылается на себя?
-		compositeName := typ.TypeName
-		composite, ok := s.CompositeTypes[compositeName.String()]
-		if !ok {
-			composite = &schema.CompositeType{
-				TypeName:   compositeName,
-				Attributes: make(map[string]*schema.CompositeAttribute),
-			}
-			s.CompositeTypes[compositeName.String()] = composite
+		composite, err := p.makeCompositeType(s, typ.TypeName, dbtype)
+		if err != nil {
+			return nil, err
 		}
 		typ.CompositeType = composite
 	}
 
 	return moreTypes, nil
+}
+
+func (p *Parser) makeDomainType(
+	s *schema.Schema,
+	domainTypeName schema.Identifier,
+	dbtype queries.Type,
+) (needLoad *schema.Identifier, domain *schema.DomainType, err error) {
+	domain, ok := s.DomainTypes[domainTypeName.String()]
+	if ok {
+		// TODO это правильно?
+		return nil, nil, fmt.Errorf("duplicate domain type: %q", domainTypeName)
+	}
+	defer func() {
+		s.DomainTypes[domainTypeName.String()] = domain
+	}()
+
+	// Тип элемента, на котором основан домен
+	elemTypeName := schema.Identifier{
+		Schema: dbtype.DomainSchema.String,
+		Name:   dbtype.DomainType.String,
+	}
+	elemType, ok := s.Types[elemTypeName.String()]
+	if !ok {
+		elemType = &schema.DBType{
+			TypeName: elemTypeName,
+		}
+		s.Types[elemTypeName.String()] = elemType
+		needLoad = &elemTypeName
+	}
+
+	domain = &schema.DomainType{
+		TypeName: domainTypeName,
+		Attributes: schema.DomainAttributes{
+			Nullable:         !dbtype.DomainIsNotNullable,
+			HasCharMaxLength: dbtype.DomainCharacterMaxSize.Valid,
+			CharMaxLength:    dbtype.DomainCharacterMaxSize.Int,
+			ArrayDims:        dbtype.DomainArrayDims,
+		},
+		ElemType: elemType,
+	}
+
+	return needLoad, domain, nil
+}
+
+func (p *Parser) makeArrayType(
+	s *schema.Schema,
+	arrayTypeName schema.Identifier,
+	dbtype queries.Type,
+) (needLoad *schema.Identifier, array *schema.ArrayType, err error) {
+	array, ok := s.ArrayTypes[arrayTypeName.String()]
+	if ok {
+		// TODO это правильно?
+		return nil, nil, fmt.Errorf("duplicate domain type: %q", arrayTypeName)
+	}
+	defer func() {
+		s.ArrayTypes[arrayTypeName.String()] = array
+	}()
+
+	// Тип элемента массива
+	elemTypeName := schema.Identifier{
+		Schema: dbtype.ElemTypeSchema.String,
+		Name:   dbtype.ElemTypeSchema.String,
+	}
+	elemType, ok := s.Types[elemTypeName.String()]
+	if !ok {
+		elemType = &schema.DBType{
+			TypeName: elemTypeName,
+		}
+		s.Types[elemTypeName.String()] = elemType
+		needLoad = &elemTypeName
+	}
+
+	array = &schema.ArrayType{
+		TypeName: arrayTypeName,
+		ElemType: elemType,
+	}
+
+	return needLoad, array, nil
+}
+
+func (p *Parser) makeEnumType(
+	s *schema.Schema,
+	enumTypeName schema.Identifier,
+	dbtype queries.Type,
+) (enum *schema.EnumType, err error) {
+	enum, ok := s.EnumTypes[enumTypeName.String()]
+	if ok {
+		// TODO это правильно?
+		return nil, fmt.Errorf("duplicate domain type: %q", enumTypeName)
+	}
+	defer func() {
+		s.EnumTypes[enumTypeName.String()] = enum
+	}()
+
+	return &schema.EnumType{
+		TypeName: enumTypeName,
+	}, nil
+}
+
+func (p *Parser) makeRangeType(
+	s *schema.Schema,
+	rangeTypeName schema.Identifier,
+	dbtype queries.Type,
+) (needLoad *schema.Identifier, rng *schema.RangeType, err error) {
+	rng, ok := s.RangeTypes[rangeTypeName.String()]
+	if ok {
+		// TODO это правильно?
+		return nil, nil, fmt.Errorf("duplicate domain type: %q", rangeTypeName)
+	}
+	defer func() {
+		s.RangeTypes[rangeTypeName.String()] = rng
+	}()
+
+	elemTypeName := schema.Identifier{
+		Schema: dbtype.RangeElementTypeSchema.String,
+		Name:   dbtype.RangeElementTypeName.String,
+	}
+	elemType, ok := s.Types[elemTypeName.String()]
+	if !ok {
+		elemType = &schema.DBType{
+			TypeName: elemTypeName,
+		}
+		s.Types[elemTypeName.String()] = elemType
+		needLoad = &elemTypeName
+	}
+
+	rng = &schema.RangeType{
+		TypeName: rangeTypeName,
+		ElemType: elemType,
+	}
+
+	return needLoad, rng, nil
+}
+
+func (p *Parser) makeCompositeType(
+	s *schema.Schema,
+	compositeTypeName schema.Identifier,
+	dbtype queries.Type,
+) (composite *schema.CompositeType, err error) {
+	composite, ok := s.CompositeTypes[compositeTypeName.String()]
+	if ok {
+		// TODO это правильно?
+		return nil, fmt.Errorf("duplicate domain type: %q", compositeTypeName)
+	}
+	defer func() {
+		s.CompositeTypes[compositeTypeName.String()] = composite
+	}()
+
+	return &schema.CompositeType{
+		TypeName: compositeTypeName,
+		// TODO а чо мне делать с композитами?
+		Attributes: make(map[string]*schema.CompositeAttribute),
+	}, nil
 }
 
 func (p *Parser) LoadEnums(ctx context.Context, s *schema.Schema) error {

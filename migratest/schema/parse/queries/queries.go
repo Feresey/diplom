@@ -166,6 +166,10 @@ type Type struct {
 	DomainType             null.String
 	DomainCharacterMaxSize null.Int
 	DomainArrayDims        int
+	RangeElementTypeSchema null.String
+	RangeElementTypeName   null.String
+	MultiRangeTypeSchema   null.String
+	MultiRangeTypeName     null.String
 }
 
 func QueryTypes(ctx context.Context, exec Executor, typeNames []string) ([]Type, error) {
@@ -176,14 +180,21 @@ func QueryTypes(ctx context.Context, exec Executor, typeNames []string) ([]Type,
 				&v.SchemaName,
 				&v.TypeName,
 				&v.TypeType,
+
+				&v.IsArray,
 				&v.ElemTypeSchema,
 				&v.ElemTypeName,
-				&v.IsArray,
+
 				&v.DomainIsNotNullable,
 				&v.DomainSchema,
 				&v.DomainType,
 				&v.DomainCharacterMaxSize,
 				&v.DomainArrayDims,
+
+				&v.RangeElementTypeSchema,
+				&v.RangeElementTypeName,
+				&v.MultiRangeTypeSchema,
+				&v.MultiRangeTypeName,
 			)
 		}, typeNames)
 }
