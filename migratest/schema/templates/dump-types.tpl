@@ -1,4 +1,4 @@
-{{- range .Types }}
+{{- range . }}
 TYPE {{.TypeName}} {{.Type.String | upper}}
 {{- /* switch Type */}}
 {{- $type := .}}

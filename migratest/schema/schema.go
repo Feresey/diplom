@@ -45,13 +45,13 @@ type Table struct {
 }
 
 // ForeignKey описывает внешнюю связь
+// В PostgreSQL FK может ссылаться на PK или UNIQUE
 type ForeignKey struct {
-	// CONSTRAINT в текущей таблице
+	// CONSTRAINT во внешней таблице
 	// Uniq.Type IN (PK, UNIQUE)
 	Uniq *Constraint
 
-	// В PostgreSQL FK может ссылаться на PK или UNIQUE индекс
-	// CONSTRAINT во внешней таблице
+	// CONSTRAINT в текущей таблице
 	// Foreign.Type == FK
 	Foreign *Constraint
 }
@@ -169,12 +169,12 @@ const (
 type Constraint struct {
 	// Имя ограничения
 	Name Identifier
-	// Таблица, которой принадлежит ограничение
-	Table *Table
 	// Тип ограничения
 	Type ConstraintType
 	// Только для UNIQUE индекса
 	NullsNotDistinct bool
+	// Таблица, которой принадлежит ограничение
+	Table *Table
 
 	// Результат функции pg_getconstraintdef. Я не уверен что это вообще нужно, но пусть будет.
 	Definition string
@@ -182,7 +182,6 @@ type Constraint struct {
 	// Колонки, на которые действует ограничение
 	// Колонки всегда принадлежат той же таблице, которой принадлежит ограничение
 	// Количество колонок всегда >= 1
-	// Для PRIMARY KEY колонка всегда одна
 	// Ключ мапы - имя колонки
 	Columns map[string]*Column
 }

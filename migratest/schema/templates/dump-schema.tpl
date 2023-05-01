@@ -28,12 +28,8 @@ TABLE {{$table.Name}} (
     {{- end}}
     {{- /* with attributes */}}
     {{- with $column.Attributes}}
-        {{- if .NotNullable}}{{" " -}}
-            NOT NULL
-        {{- end}}
-        {{- if .HasDefault}}{{" " -}}
-            {{.Default}}
-        {{- end}}
+        {{- if .NotNullable}} NOT NULL{{end}}
+        {{- if .HasDefault}} DEFAULT {{.Default}}{{end}}
     {{- /* with attributes */}}
     {{- end}}
     {{- /* range foreign keys */}}

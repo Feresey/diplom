@@ -1,17 +1,26 @@
 package schema
 
 type Graph struct {
-	schema *Schema
-
+	Schema *Schema
 	Grapth map[string]map[string]*Table
 }
 
-func NewGraph(schema *Schema) *Graph {
-	g := &Graph{schema: schema}
+func NewGrapth(schema *Schema) *Graph {
+	g := &Graph{
+		Schema: schema,
+	}
 	g.build()
 	return g
 }
 
 func (g *Graph) build() {
-	// TODO пора делать граф
+	g.Grapth = make(map[string]map[string]*Table, len(g.Schema.Tables))
+	for tablename, table := range g.Schema.Tables {
+		foreignTables := make(map[string]*Table, len(table.ForeignKeys))
+		g.Grapth[tablename] = foreignTables
+		for _, fk := range table.ForeignKeys {
+			foreignTable := fk.Uniq.Table
+			foreignTables[foreignTable.Name.String()] = foreignTable
+		}
+	}
 }

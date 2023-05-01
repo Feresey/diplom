@@ -160,14 +160,21 @@ func launch(
 		return fmt.Errorf("error loading schema: %w", err)
 	}
 
+	grapth := schema.NewGrapth(s)
+
 	log.Info("dump schema")
-	if err := s.Dump(os.Stdout, schema.DumpSchemaTemplate); err != nil {
+	if err := grapth.Dump(os.Stdout, schema.DumpSchemaTemplate); err != nil {
 		return fmt.Errorf("failed to dump schema: %w", err)
 	}
 
 	log.Info("dump types")
-	if err := s.Dump(os.Stdout, schema.DumpTypesTemplate); err != nil {
+	if err := grapth.Dump(os.Stdout, schema.DumpTypesTemplate); err != nil {
 		return fmt.Errorf("failed to dump types: %w", err)
+	}
+
+	log.Info("dump grapth")
+	if err := grapth.Dump(os.Stdout, schema.DumpGrapthTemplate); err != nil {
+		return fmt.Errorf("failed to dump grapth: %w", err)
 	}
 
 	return nil
