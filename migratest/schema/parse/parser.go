@@ -146,9 +146,10 @@ func (p *Parser) LoadTablesColumns(ctx context.Context, s *schema.Schema) error 
 				HasDefault: dbcolumn.HasDefault || dbcolumn.IsGenerated,
 				Default:    dbcolumn.DefaultExpr.String,
 				DomainAttributes: schema.DomainAttributes{
-					NotNullable:      dbcolumn.IsNullable,
+					NotNullable:   dbcolumn.IsNullable,
+					CharMaxLength: dbcolumn.CharacterMaxLength.Int,
+					// TODO как определить для VARCHAR(100)[]?
 					HasCharMaxLength: dbcolumn.CharacterMaxLength.Valid,
-					CharMaxLength:    dbcolumn.CharacterMaxLength.Int,
 					ArrayDims:        dbcolumn.ArrayDims,
 				},
 			},

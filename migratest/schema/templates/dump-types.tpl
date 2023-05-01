@@ -24,7 +24,7 @@ TYPE {{.TypeName}} {{.Type.String | upper}}
         <ENUM TYPE IS NOT SPECIFIED>
     {{- end}}
 )
-{{- else if eq . "Composite"}} (TODO)
+{{- else if eq . "Composite"}} ({{/*TODO*/}})
 {{- else if eq . "Domain" -}}
     {{- with $type.DomainType}}
         {{- with .ElemType}}{{" " -}}
@@ -36,7 +36,7 @@ TYPE {{.TypeName}} {{.Type.String | upper}}
             {{- if .HasCharMaxLength}}({{.CharMaxLength}})
             {{- end}}
             {{- if gt .ArrayDims 0}}
-                {{.ArrayDims}} TODO
+                {{- repeat .ArrayDims "[]"}}
             {{- end}}
             {{- if not .NotNullable}} NOT NULL
             {{- end}}
