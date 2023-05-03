@@ -31,11 +31,8 @@ type Parser struct {
 type Queries interface {
 	Tables(context.Context, queries.Executor, []queries.TablesPattern) ([]queries.Tables, error)
 	Columns(context.Context, queries.Executor, []string) ([]queries.Column, error)
-	TableConstraints(context.Context, queries.Executor, []string) ([]queries.TableConstraint, error)
-	ForeignKeys(context.Context, queries.Executor, []string) ([]queries.ForeignKey, error)
-	ConstraintColumns(context.Context, queries.Executor, []string, []string) ([]queries.ConstraintColumn, error)
+	Constraints(context.Context, queries.Executor, []string) ([]queries.Constraint, error)
 	Types(context.Context, queries.Executor, []string) ([]queries.Type, error)
-	ArrayTypes(context.Context, queries.Executor, []string) ([]queries.ArrayType, error)
 	Enums(context.Context, queries.Executor, []string) ([]queries.Enum, error)
 }
 
@@ -77,14 +74,6 @@ func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, e
 	}
 	if err := p.loadConstraints(ctx, s); err != nil {
 		return nil, fmt.Errorf("load constraints: %w", err)
-	}
-
-	constraintNames := mapKeys(s.Constraints)
-	if err := p.loadConstraintsColumns(ctx, s, constraintNames); err != nil {
-		return nil, fmt.Errorf("load constraints columns: %w", err)
-	}
-	if err := p.loadForeignConstraints(ctx, s, constraintNames); err != nil {
-		return nil, fmt.Errorf("load foreign constraints: %w", err)
 	}
 
 	if err := p.loadTypes(ctx, s); err != nil {
@@ -202,7 +191,7 @@ var pgConstraintType = map[string]schema.ConstraintType{
 
 // loadConstraints загружает ограничения для всех найденных таблиц
 func (p *Parser) loadConstraints(ctx context.Context, s *schema.Schema) error {
-	constraints, err := p.q.TableConstraints(ctx, p.conn, s.TableNames)
+	constraints, err := p.q.Constraints(ctx, p.conn, s.TableNames)
 	if err != nil {
 		p.log.Error("failed to query tables constraints", zap.Error(err))
 		return err
@@ -211,125 +200,134 @@ func (p *Parser) loadConstraints(ctx context.Context, s *schema.Schema) error {
 
 	// realloc
 	s.Constraints = make(map[string]*schema.Constraint, len(constraints))
-	for _, dbconstraint := range constraints {
-		tableName := schema.Identifier{
-			Schema: dbconstraint.TableSchema,
-			Name:   dbconstraint.TableName,
-		}
-
-		table, ok := s.Tables[tableName.String()]
-		if !ok {
-			return fmt.Errorf("unable to find table %q", tableName)
-		}
-		typ, ok := pgConstraintType[dbconstraint.ConstraintType]
-		if !ok {
-			return fmt.Errorf("unsupported constraint type: %q", dbconstraint.ConstraintType)
-		}
-
-		c := &schema.Constraint{
-			Name: schema.Identifier{
-				Schema: dbconstraint.ConstraintSchema,
-				Name:   dbconstraint.ConstraintName,
-			},
-			Table:            table,
-			Type:             typ,
-			NullsNotDistinct: dbconstraint.NullsNotDistinct,
-			Definition:       dbconstraint.ConstraintDef,
-			Columns:          make(map[string]*schema.Column),
-		}
-
-		s.Constraints[c.Name.String()] = c
-		table.Constraints[c.Name.String()] = c
-
-		switch c.Type {
-		case schema.ConstraintTypePK:
-			// PRIMARY KEY всегда один
-			table.PrimaryKey = c
-		case schema.ConstraintTypeFK:
-			table.ReferencedBy[c.Name.String()] = c
+	for idx := range constraints {
+		if err := p.makeConstraint(s, &constraints[idx]); err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-func (p *Parser) loadConstraintsColumns(ctx context.Context, s *schema.Schema, constraintNames []string) error {
-	constraintsColumns, err := p.q.ConstraintColumns(ctx, p.conn, s.TableNames, constraintNames)
-	if err != nil {
-		p.log.Error("failed to query constraints columns", zap.Error(err))
-		return err
+func (p *Parser) makeConstraint(
+	s *schema.Schema,
+	dbconstraint *queries.Constraint,
+) error {
+	constraintName := schema.Identifier{
+		OID:    dbconstraint.ConstraintOID,
+		Schema: dbconstraint.SchemaName,
+		Name:   dbconstraint.ConstraintName,
 	}
-	p.log.Debug("load constraints columns", zap.Int("n", len(constraintsColumns)))
 
-	for _, dbc := range constraintsColumns {
-		constraintName := schema.Identifier{
-			Schema: dbc.SchemaName,
-			Name:   dbc.ConstraintName,
-		}
-		tableName := schema.Identifier{
-			Schema: dbc.SchemaName,
-			Name:   dbc.TableName,
+	_, ok := s.Constraints[constraintName.String()]
+	if ok {
+		return fmt.Errorf("duplicate constraint %q", constraintName)
+	}
+
+	tableName := schema.Identifier{
+		OID:    dbconstraint.TableOID,
+		Schema: dbconstraint.SchemaName,
+		Name:   dbconstraint.TableName,
+	}
+
+	table, ok := s.Tables[tableName.String()]
+	if !ok {
+		return fmt.Errorf("unable to find table %q", tableName)
+	}
+	typ, ok := pgConstraintType[dbconstraint.ConstraintType]
+	if !ok {
+		return fmt.Errorf("unsupported constraint type: %q", dbconstraint.ConstraintType)
+	}
+
+	c := &schema.Constraint{
+		Name:             constraintName,
+		Table:            table,
+		Type:             typ,
+		NullsNotDistinct: dbconstraint.NullsNotDistinct,
+		Definition:       dbconstraint.ConstraintDef,
+	}
+
+	cols, err := p.checkTableColumns(dbconstraint.Columns, table)
+	if err != nil {
+		return fmt.Errorf("check table columns for constraint %q: %w", c.Name, err)
+	}
+	c.Columns = cols
+
+	s.Constraints[constraintName.String()] = c
+	table.Constraints[c.Name.String()] = c
+
+	// FIXME если тут что-то вышло значит запрос кривой
+	if c.Type != schema.ConstraintTypeFK && dbconstraint.ForeignTableOID.Valid {
+		p.log.Error("foreign columns in not foreign constraint", zap.Reflect("constraint", dbconstraint))
+	}
+
+	switch c.Type {
+	case schema.ConstraintTypePK:
+		// PRIMARY KEY либо один либо нет его
+		table.PrimaryKey = c
+		return nil
+	case schema.ConstraintTypeFK:
+		fk, err := p.makeForeignConstraint(s, c, dbconstraint)
+		if err != nil {
+			return err
 		}
 
-		constraint, ok := s.Constraints[constraintName.String()]
-		if !ok {
-			return fmt.Errorf("constraint %q not found", constraintName)
-		}
-		table, ok := s.Tables[tableName.String()]
-		if !ok {
-			return fmt.Errorf("table %q not found for constraint %q", tableName, constraintName)
-		}
-		column, ok := table.Columns[dbc.ColumnName]
-		if !ok {
-			return fmt.Errorf("column %q not found in table %q for constraint %q",
-				dbc.ColumnName,
-				tableName,
-				constraintName,
-			)
-		}
-
-		constraint.Columns[dbc.ColumnName] = column
+		table.ForeignKeys[c.Name.String()] = fk
 	}
 
 	return nil
 }
 
-func (p *Parser) loadForeignConstraints(ctx context.Context, s *schema.Schema, constraintNames []string) error {
-	fks, err := p.q.ForeignKeys(ctx, p.conn, constraintNames)
+func (p *Parser) checkTableColumns(columns []string, table *schema.Table) (map[string]*schema.Column, error) {
+	cols := make(map[string]*schema.Column, len(columns))
+	for _, column := range columns {
+		tcol, ok := table.Columns[column]
+		if !ok {
+			return nil, fmt.Errorf("column %q not found in table %q", column, table.Name)
+		}
+
+		cols[column] = tcol
+	}
+	return cols, nil
+}
+
+func (p *Parser) makeForeignConstraint(
+	s *schema.Schema,
+	c *schema.Constraint,
+	dbconstraint *queries.Constraint,
+) (*schema.ForeignKey, error) {
+	foreignTableName := schema.Identifier{
+		OID:    int(dbconstraint.ForeignTableOID.Int32),
+		Schema: dbconstraint.ForeignSchemaName.String,
+		Name:   dbconstraint.ForeignTableName.String,
+	}
+	ftable, ok := s.Tables[foreignTableName.String()]
+	if !ok {
+		return nil, fmt.Errorf("foreign table %q not found for constraint %q", foreignTableName, c.Name)
+	}
+	ftable.ReferencedBy[c.Name.String()] = c
+
+	fk := &schema.ForeignKey{
+		Foreign:          c,
+		Reference:        ftable,
+		ReferenceColumns: make(map[string]*schema.Column, len(dbconstraint.ForeignColumns)),
+	}
+
+	columns := make([]string, 0, len(dbconstraint.ForeignColumns))
+	for _, column := range dbconstraint.ForeignColumns {
+		if !column.Valid {
+			return nil, fmt.Errorf("null foreign column for constraint %q", c.Name)
+		}
+		columns = append(columns, column.String)
+	}
+
+	cols, err := p.checkTableColumns(columns, ftable)
 	if err != nil {
-		p.log.Error("failed to query foreign constraints", zap.Error(err))
-		return err
+		return nil, fmt.Errorf("check foreign table columns for constraint %q: %w", c.Name, err)
 	}
-	p.log.Debug("loaded foreign constraints", zap.Reflect("constraints", fks))
+	fk.ReferenceColumns = cols
 
-	for _, dbfk := range fks {
-		fkName := schema.Identifier{
-			Schema: dbfk.ConstraintSchema,
-			Name:   dbfk.ConstraintName,
-		}
-		uniqName := schema.Identifier{
-			Schema: dbfk.UniqueConstraintSchema,
-			Name:   dbfk.UniqueConstraintName,
-		}
-		fk, ok := s.Constraints[fkName.String()]
-		if !ok {
-			return fmt.Errorf("constraint %q not found", fkName)
-		}
-		uniq, ok := s.Constraints[uniqName.String()]
-		if !ok {
-			return fmt.Errorf("constraint %q not found", uniqName)
-		}
-
-		// таблица, которая ссылается
-		fk.Table.ForeignKeys[fk.Name.String()] = &schema.ForeignKey{
-			Uniq:    uniq,
-			Foreign: fk,
-		}
-		// таблица, на которую ссылаются
-		uniq.Table.ReferencedBy[uniq.Name.String()] = uniq
-	}
-
-	return nil
+	return fk, nil
 }
 
 func (p *Parser) loadTypes(ctx context.Context, s *schema.Schema) error {

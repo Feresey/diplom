@@ -54,7 +54,7 @@ class {{$table.Name}} {
   {{- range .ForeignKeys}}
     {{- $fk := .}}
     {{- range .Foreign.Columns}}
-  *   {{- template "dump-column-uml" .}} REFERENCES {{$fk.Uniq.Table.Name}}({{$fk.Uniq.Columns | columnNames}})
+  *   {{- template "dump-column-uml" .}} REFERENCES {{$fk.Reference.Name}}({{$fk.ReferenceColumns | columnNames}})
     {{- end}}
   {{- /* range fk */}}
   {{- end}}

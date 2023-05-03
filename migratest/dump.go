@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/Feresey/mtest/parse"
+	"github.com/Feresey/mtest/parse/queries"
 	"github.com/Feresey/mtest/schema"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/fx"
@@ -83,9 +84,10 @@ func parseSchema(
 ) error {
 	s, err := parser.LoadSchema(ctx, pc)
 	if err != nil {
-		prettyErr, ok := err.(interface{ Pretty() string })
-		if ok {
-			log.Error(prettyErr.Pretty())
+		log.Error(err.Error())
+		var pErr queries.Error
+		if errors.As(err, &pErr) {
+			log.Error(pErr.Pretty())
 			// TODO экзит коды
 			return nil
 		}

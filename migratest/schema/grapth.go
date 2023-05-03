@@ -19,8 +19,7 @@ func (g *Graph) build() {
 		foreignTables := make(map[string]*Table, len(table.ForeignKeys))
 		g.Grapth[tablename] = foreignTables
 		for _, fk := range table.ForeignKeys {
-			foreignTable := fk.Uniq.Table
-			foreignTables[foreignTable.Name.String()] = foreignTable
+			foreignTables[fk.Reference.Name.String()] = fk.Reference
 		}
 	}
 }

@@ -46,7 +46,7 @@ func (Queries) Tables(ctx context.Context, exec Executor, p []TablesPattern) ([]
 	}
 
 	return QueryAll(
-		ctx, exec, fmt.Sprintf("%s AND (%s)", queryTablesSQL, where),
+		ctx, exec, fmt.Sprintf("%s AND (%s) ORDER BY ", queryTablesSQL, where),
 		func(scan pgx.Rows, v *Tables) error {
 			return scan.Scan(
 				&v.OID,
@@ -97,63 +97,53 @@ func (Queries) Columns(ctx context.Context, exec Executor, tableNames []string) 
 		}, tableNames)
 }
 
-//go:embed sql/table_constraints.sql
+//go:embed sql/constraints.sql
 var queryTableConstraintsSQL string
 
-type TableConstraint struct {
-	TableSchema      string
-	TableName        string
-	ConstraintSchema string
-	ConstraintName   string
+type Constraint struct {
+	SchemaName string
+
+	ConstraintOID  int
+	ConstraintName string
+
 	ConstraintType   string
 	NullsNotDistinct bool
 	ConstraintDef    string
+
+	TableOID  int
+	TableName string
+	Columns   []string
+
+	ForeignTableOID   sql.NullInt32
+	ForeignSchemaName sql.NullString
+	ForeignTableName  sql.NullString
+	ForeignColumns    []sql.NullString
 }
 
-func (Queries) TableConstraints(ctx context.Context, exec Executor, tableNames []string) ([]TableConstraint, error) {
+func (Queries) Constraints(ctx context.Context, exec Executor, tableNames []string) ([]Constraint, error) {
 	return QueryAll(
 		ctx, exec, queryTableConstraintsSQL,
-		func(scan pgx.Rows, v *TableConstraint) error {
+		func(scan pgx.Rows, v *Constraint) error {
 			return scan.Scan(
-				&v.TableSchema,
-				&v.TableName,
-				&v.ConstraintSchema,
+				&v.SchemaName,
+
+				&v.ConstraintOID,
 				&v.ConstraintName,
+
 				&v.ConstraintType,
 				&v.NullsNotDistinct,
 				&v.ConstraintDef,
+
+				&v.TableOID,
+				&v.TableName,
+				&v.Columns,
+
+				&v.ForeignTableOID,
+				&v.ForeignSchemaName,
+				&v.ForeignTableName,
+				&v.ForeignColumns,
 			)
 		}, tableNames)
-}
-
-//go:embed sql/constraint_columns.sql
-var queryConstraintColumnsSQL string
-
-type ConstraintIdentifier struct {
-	OID            int
-	SchemaName     string
-	ConstraintName string
-	TableName      string
-}
-
-type ConstraintColumn struct {
-	ColumnName     string
-}
-
-func (Queries) ConstraintColumns(
-	ctx context.Context, exec Executor,
-	tableNames []string, constraintNames []string,
-) ([]ConstraintColumn, error) {
-	return QueryAll(
-		ctx, exec, queryConstraintColumnsSQL,
-		func(scan pgx.Rows, v *ConstraintColumn) error {
-			return scan.Scan(
-				&v.SchemaName,
-				&v.ConstraintName,
-				&v.TableName,
-				&v.ColumnName,
-			)
-		}, tableNames, constraintNames)
 }
 
 //go:embed sql/types/types.sql
@@ -202,27 +192,6 @@ func (Queries) Types(ctx context.Context, exec Executor, typeNames []string) ([]
 				&v.MultiRangeTypeName,
 			)
 		}, typeNames)
-}
-
-//go:embed sql/types/array.sql
-var queryArrayTypesSQL string
-
-type ArrayType struct {
-	SchemaName string
-	ArrayName  string
-	ElemName   string
-}
-
-func (Queries) ArrayTypes(ctx context.Context, exec Executor, arrayNames []string) ([]ArrayType, error) {
-	return QueryAll(
-		ctx, exec, queryArrayTypesSQL,
-		func(scan pgx.Rows, v *ArrayType) error {
-			return scan.Scan(
-				&v.SchemaName,
-				&v.ArrayName,
-				&v.ElemName,
-			)
-		}, arrayNames)
 }
 
 //go:embed sql/types/enum.sql

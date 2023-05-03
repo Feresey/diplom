@@ -16,9 +16,7 @@ func TestTypes(t *testing.T) {
 		name    string
 		tables  []queries.Tables
 		columns []queries.Column
-		tc      []queries.TableConstraint
-		ccols   []queries.ConstraintColumn
-		fk      []queries.ForeignKey
+		tc      []queries.Constraint
 		types   []queries.Type
 		enums   []queries.Enum
 	}{
@@ -41,9 +39,7 @@ func TestTypes(t *testing.T) {
 			q := NewMockQueries(t)
 			q.EXPECT().Tables(mock.Anything, mock.Anything, mock.Anything).Return(tt.tables, nil)
 			q.EXPECT().Columns(mock.Anything, mock.Anything, mock.Anything).Return(tt.columns, nil)
-			q.EXPECT().TableConstraints(mock.Anything, mock.Anything, mock.Anything).Return(tt.tc, nil)
-			q.EXPECT().ConstraintColumns(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tt.ccols, nil)
-			q.EXPECT().ForeignKeys(mock.Anything, mock.Anything, mock.Anything).Return(tt.fk, nil)
+			q.EXPECT().Constraints(mock.Anything, mock.Anything, mock.Anything).Return(tt.tc, nil)
 			q.EXPECT().Types(mock.Anything, mock.Anything, mock.Anything).Return(tt.types, nil)
 			q.EXPECT().Enums(mock.Anything, mock.Anything, mock.Anything).Return(tt.enums, nil)
 

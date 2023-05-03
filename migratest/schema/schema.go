@@ -38,7 +38,7 @@ type Table struct {
 
 	// Главный ключ таблицы (может быть nil)
 	PrimaryKey *Constraint
-	// Внешние ключи таблицы, ключ мапы - FK
+	// Внешние ключи таблицы, ключ мапы - FK Name
 	ForeignKeys map[string]*ForeignKey
 	// Ключи, которые ссылаются на эту таблицу, ключ мапы - UNIQUE CONSTRAINT
 	ReferencedBy map[string]*Constraint
@@ -48,15 +48,15 @@ type Table struct {
 }
 
 // ForeignKey описывает внешнюю связь
-// В PostgreSQL FK может ссылаться на PK или UNIQUE
+// В PostgreSQL FK может ссылаться на PRIMARY KEY CONSTRAINT, UNIQUE CONSTRAINT, UNIQUE INDEX.
 type ForeignKey struct {
-	// CONSTRAINT во внешней таблице
-	// Uniq.Type IN (PK, UNIQUE)
-	Uniq *Constraint
-
 	// CONSTRAINT в текущей таблице
 	// Foreign.Type == FK
 	Foreign *Constraint
+	// Таблица, на которую ссылаются
+	Reference *Table
+	// Список колонок во внешней таблице, на которые ссылается FOREIGN KEY
+	ReferenceColumns map[string]*Column
 }
 
 // Column описывает колонку таблицы

@@ -35,7 +35,7 @@ TABLE {{$table.Name}} (
     {{- /* range foreign keys */}}
     {{- range $fk_id, $fk := $table.ForeignKeys}}
         {{- with index $fk.Foreign.Columns $column.Name}}
-            {{- ""}} CONSTRAINT {{ $fk.Foreign.Name}} REFERENCES {{$fk.Uniq.Table.Name}}({{$fk.Uniq.Columns | columnNames}})
+            {{- ""}} CONSTRAINT {{ $fk.Foreign.Name}} REFERENCES {{$fk.Reference.Name}}({{$fk.ReferenceColumns | columnNames}})
         {{- end}}
     {{- /* range foreign keys */}}
     {{- end}}

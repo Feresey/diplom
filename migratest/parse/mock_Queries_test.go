@@ -22,62 +22,6 @@ func (_m *MockQueries) EXPECT() *MockQueries_Expecter {
 	return &MockQueries_Expecter{mock: &_m.Mock}
 }
 
-// ArrayTypes provides a mock function with given fields: _a0, _a1, _a2
-func (_m *MockQueries) ArrayTypes(_a0 context.Context, _a1 queries.Executor, _a2 []string) ([]queries.ArrayType, error) {
-	ret := _m.Called(_a0, _a1, _a2)
-
-	var r0 []queries.ArrayType
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []string) ([]queries.ArrayType, error)); ok {
-		return rf(_a0, _a1, _a2)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []string) []queries.ArrayType); ok {
-		r0 = rf(_a0, _a1, _a2)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]queries.ArrayType)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, queries.Executor, []string) error); ok {
-		r1 = rf(_a0, _a1, _a2)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockQueries_ArrayTypes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ArrayTypes'
-type MockQueries_ArrayTypes_Call struct {
-	*mock.Call
-}
-
-// ArrayTypes is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - _a1 queries.Executor
-//   - _a2 []string
-func (_e *MockQueries_Expecter) ArrayTypes(_a0 interface{}, _a1 interface{}, _a2 interface{}) *MockQueries_ArrayTypes_Call {
-	return &MockQueries_ArrayTypes_Call{Call: _e.mock.On("ArrayTypes", _a0, _a1, _a2)}
-}
-
-func (_c *MockQueries_ArrayTypes_Call) Run(run func(_a0 context.Context, _a1 queries.Executor, _a2 []string)) *MockQueries_ArrayTypes_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(queries.Executor), args[2].([]string))
-	})
-	return _c
-}
-
-func (_c *MockQueries_ArrayTypes_Call) Return(_a0 []queries.ArrayType, _a1 error) *MockQueries_ArrayTypes_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockQueries_ArrayTypes_Call) RunAndReturn(run func(context.Context, queries.Executor, []string) ([]queries.ArrayType, error)) *MockQueries_ArrayTypes_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Columns provides a mock function with given fields: _a0, _a1, _a2
 func (_m *MockQueries) Columns(_a0 context.Context, _a1 queries.Executor, _a2 []string) ([]queries.Column, error) {
 	ret := _m.Called(_a0, _a1, _a2)
@@ -134,25 +78,25 @@ func (_c *MockQueries_Columns_Call) RunAndReturn(run func(context.Context, queri
 	return _c
 }
 
-// ConstraintColumns provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *MockQueries) ConstraintColumns(_a0 context.Context, _a1 queries.Executor, _a2 []string, _a3 []string) ([]queries.ConstraintColumn, error) {
-	ret := _m.Called(_a0, _a1, _a2, _a3)
+// Constraints provides a mock function with given fields: _a0, _a1, _a2
+func (_m *MockQueries) Constraints(_a0 context.Context, _a1 queries.Executor, _a2 []string) ([]queries.Constraint, error) {
+	ret := _m.Called(_a0, _a1, _a2)
 
-	var r0 []queries.ConstraintColumn
+	var r0 []queries.Constraint
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []string, []string) ([]queries.ConstraintColumn, error)); ok {
-		return rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []string) ([]queries.Constraint, error)); ok {
+		return rf(_a0, _a1, _a2)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []string, []string) []queries.ConstraintColumn); ok {
-		r0 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []string) []queries.Constraint); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]queries.ConstraintColumn)
+			r0 = ret.Get(0).([]queries.Constraint)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, queries.Executor, []string, []string) error); ok {
-		r1 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(1).(func(context.Context, queries.Executor, []string) error); ok {
+		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -160,33 +104,32 @@ func (_m *MockQueries) ConstraintColumns(_a0 context.Context, _a1 queries.Execut
 	return r0, r1
 }
 
-// MockQueries_ConstraintColumns_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ConstraintColumns'
-type MockQueries_ConstraintColumns_Call struct {
+// MockQueries_Constraints_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Constraints'
+type MockQueries_Constraints_Call struct {
 	*mock.Call
 }
 
-// ConstraintColumns is a helper method to define mock.On call
+// Constraints is a helper method to define mock.On call
 //   - _a0 context.Context
 //   - _a1 queries.Executor
 //   - _a2 []string
-//   - _a3 []string
-func (_e *MockQueries_Expecter) ConstraintColumns(_a0 interface{}, _a1 interface{}, _a2 interface{}, _a3 interface{}) *MockQueries_ConstraintColumns_Call {
-	return &MockQueries_ConstraintColumns_Call{Call: _e.mock.On("ConstraintColumns", _a0, _a1, _a2, _a3)}
+func (_e *MockQueries_Expecter) Constraints(_a0 interface{}, _a1 interface{}, _a2 interface{}) *MockQueries_Constraints_Call {
+	return &MockQueries_Constraints_Call{Call: _e.mock.On("Constraints", _a0, _a1, _a2)}
 }
 
-func (_c *MockQueries_ConstraintColumns_Call) Run(run func(_a0 context.Context, _a1 queries.Executor, _a2 []string, _a3 []string)) *MockQueries_ConstraintColumns_Call {
+func (_c *MockQueries_Constraints_Call) Run(run func(_a0 context.Context, _a1 queries.Executor, _a2 []string)) *MockQueries_Constraints_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(queries.Executor), args[2].([]string), args[3].([]string))
+		run(args[0].(context.Context), args[1].(queries.Executor), args[2].([]string))
 	})
 	return _c
 }
 
-func (_c *MockQueries_ConstraintColumns_Call) Return(_a0 []queries.ConstraintColumn, _a1 error) *MockQueries_ConstraintColumns_Call {
+func (_c *MockQueries_Constraints_Call) Return(_a0 []queries.Constraint, _a1 error) *MockQueries_Constraints_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockQueries_ConstraintColumns_Call) RunAndReturn(run func(context.Context, queries.Executor, []string, []string) ([]queries.ConstraintColumn, error)) *MockQueries_ConstraintColumns_Call {
+func (_c *MockQueries_Constraints_Call) RunAndReturn(run func(context.Context, queries.Executor, []string) ([]queries.Constraint, error)) *MockQueries_Constraints_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -243,118 +186,6 @@ func (_c *MockQueries_Enums_Call) Return(_a0 []queries.Enum, _a1 error) *MockQue
 }
 
 func (_c *MockQueries_Enums_Call) RunAndReturn(run func(context.Context, queries.Executor, []string) ([]queries.Enum, error)) *MockQueries_Enums_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ForeignKeys provides a mock function with given fields: _a0, _a1, _a2
-func (_m *MockQueries) ForeignKeys(_a0 context.Context, _a1 queries.Executor, _a2 []string) ([]queries.ForeignKey, error) {
-	ret := _m.Called(_a0, _a1, _a2)
-
-	var r0 []queries.ForeignKey
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []string) ([]queries.ForeignKey, error)); ok {
-		return rf(_a0, _a1, _a2)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []string) []queries.ForeignKey); ok {
-		r0 = rf(_a0, _a1, _a2)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]queries.ForeignKey)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, queries.Executor, []string) error); ok {
-		r1 = rf(_a0, _a1, _a2)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockQueries_ForeignKeys_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ForeignKeys'
-type MockQueries_ForeignKeys_Call struct {
-	*mock.Call
-}
-
-// ForeignKeys is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - _a1 queries.Executor
-//   - _a2 []string
-func (_e *MockQueries_Expecter) ForeignKeys(_a0 interface{}, _a1 interface{}, _a2 interface{}) *MockQueries_ForeignKeys_Call {
-	return &MockQueries_ForeignKeys_Call{Call: _e.mock.On("ForeignKeys", _a0, _a1, _a2)}
-}
-
-func (_c *MockQueries_ForeignKeys_Call) Run(run func(_a0 context.Context, _a1 queries.Executor, _a2 []string)) *MockQueries_ForeignKeys_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(queries.Executor), args[2].([]string))
-	})
-	return _c
-}
-
-func (_c *MockQueries_ForeignKeys_Call) Return(_a0 []queries.ForeignKey, _a1 error) *MockQueries_ForeignKeys_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockQueries_ForeignKeys_Call) RunAndReturn(run func(context.Context, queries.Executor, []string) ([]queries.ForeignKey, error)) *MockQueries_ForeignKeys_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// TableConstraints provides a mock function with given fields: _a0, _a1, _a2
-func (_m *MockQueries) TableConstraints(_a0 context.Context, _a1 queries.Executor, _a2 []string) ([]queries.TableConstraint, error) {
-	ret := _m.Called(_a0, _a1, _a2)
-
-	var r0 []queries.TableConstraint
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []string) ([]queries.TableConstraint, error)); ok {
-		return rf(_a0, _a1, _a2)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []string) []queries.TableConstraint); ok {
-		r0 = rf(_a0, _a1, _a2)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]queries.TableConstraint)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, queries.Executor, []string) error); ok {
-		r1 = rf(_a0, _a1, _a2)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockQueries_TableConstraints_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TableConstraints'
-type MockQueries_TableConstraints_Call struct {
-	*mock.Call
-}
-
-// TableConstraints is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - _a1 queries.Executor
-//   - _a2 []string
-func (_e *MockQueries_Expecter) TableConstraints(_a0 interface{}, _a1 interface{}, _a2 interface{}) *MockQueries_TableConstraints_Call {
-	return &MockQueries_TableConstraints_Call{Call: _e.mock.On("TableConstraints", _a0, _a1, _a2)}
-}
-
-func (_c *MockQueries_TableConstraints_Call) Run(run func(_a0 context.Context, _a1 queries.Executor, _a2 []string)) *MockQueries_TableConstraints_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(queries.Executor), args[2].([]string))
-	})
-	return _c
-}
-
-func (_c *MockQueries_TableConstraints_Call) Return(_a0 []queries.TableConstraint, _a1 error) *MockQueries_TableConstraints_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockQueries_TableConstraints_Call) RunAndReturn(run func(context.Context, queries.Executor, []string) ([]queries.TableConstraint, error)) *MockQueries_TableConstraints_Call {
 	_c.Call.Return(run)
 	return _c
 }
