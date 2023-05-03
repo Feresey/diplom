@@ -5,12 +5,11 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type Executor interface {
-	Exec(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error)
-	QueryRow(ctx context.Context, query string, args ...any) pgx.Row
+	// Exec(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error)
+	// QueryRow(ctx context.Context, query string, args ...any) pgx.Row
 	Query(ctx context.Context, query string, args ...any) (pgx.Rows, error)
 }
 

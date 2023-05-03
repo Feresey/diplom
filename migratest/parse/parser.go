@@ -22,8 +22,21 @@ type Pattern struct {
 }
 
 type Parser struct {
-	conn *db.Conn
+	conn queries.Executor
 	log  *zap.Logger
+	q    Queries
+}
+
+//go:generate mockery --name Queries --inpackage --testonly --with-expecter --quiet
+type Queries interface {
+	Tables(context.Context, queries.Executor, []queries.TablesPattern) ([]queries.Tables, error)
+	Columns(context.Context, queries.Executor, []string) ([]queries.Column, error)
+	TableConstraints(context.Context, queries.Executor, []string) ([]queries.TableConstraint, error)
+	ForeignKeys(context.Context, queries.Executor, []string) ([]queries.ForeignKey, error)
+	ConstraintColumns(context.Context, queries.Executor, []string, []string) ([]queries.ConstraintColumn, error)
+	Types(context.Context, queries.Executor, []string) ([]queries.Type, error)
+	ArrayTypes(context.Context, queries.Executor, []string) ([]queries.ArrayType, error)
+	Enums(context.Context, queries.Executor, []string) ([]queries.Enum, error)
 }
 
 func NewParser(
@@ -33,6 +46,7 @@ func NewParser(
 	return &Parser{
 		log:  log.Named("parser"),
 		conn: conn,
+		q:    queries.Queries{},
 	}
 }
 
@@ -55,36 +69,36 @@ func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, e
 		patterns = append(patterns, queries.TablesPattern(p))
 	}
 
-	if err := p.LoadTables(ctx, s, patterns...); err != nil {
+	if err := p.loadTables(ctx, s, patterns); err != nil {
 		return nil, fmt.Errorf("load tables: %w", err)
 	}
-	if err := p.LoadTablesColumns(ctx, s); err != nil {
+	if err := p.loadTablesColumns(ctx, s); err != nil {
 		return nil, fmt.Errorf("load tables columns: %w", err)
 	}
-	if err := p.LoadConstraints(ctx, s); err != nil {
+	if err := p.loadConstraints(ctx, s); err != nil {
 		return nil, fmt.Errorf("load constraints: %w", err)
 	}
 
 	constraintNames := mapKeys(s.Constraints)
-	if err := p.LoadConstraintsColumns(ctx, s, constraintNames); err != nil {
+	if err := p.loadConstraintsColumns(ctx, s, constraintNames); err != nil {
 		return nil, fmt.Errorf("load constraints columns: %w", err)
 	}
-	if err := p.LoadForeignConstraints(ctx, s, constraintNames); err != nil {
+	if err := p.loadForeignConstraints(ctx, s, constraintNames); err != nil {
 		return nil, fmt.Errorf("load foreign constraints: %w", err)
 	}
 
-	if err := p.LoadTypes(ctx, s); err != nil {
+	if err := p.loadTypes(ctx, s); err != nil {
 		return nil, fmt.Errorf("load types: %w", err)
 	}
-	if err := p.LoadEnums(ctx, s); err != nil {
+	if err := p.loadEnums(ctx, s); err != nil {
 		return nil, fmt.Errorf("load enums: %w", err)
 	}
 	return s, nil
 }
 
-// LoadTables получает имена таблиц, найденных в схемах
-func (p *Parser) LoadTables(ctx context.Context, s *schema.Schema, patterns ...queries.TablesPattern) error {
-	tables, err := queries.QueryTables(ctx, p.conn.Conn, patterns...)
+// loadTables получает имена таблиц, найденных в схемах
+func (p *Parser) loadTables(ctx context.Context, s *schema.Schema, patterns []queries.TablesPattern) error {
+	tables, err := p.q.Tables(ctx, p.conn, patterns)
 	if err != nil {
 		p.log.Error("failed to query tables", zap.Error(err))
 		return err
@@ -116,9 +130,9 @@ func (p *Parser) LoadTables(ctx context.Context, s *schema.Schema, patterns ...q
 	return nil
 }
 
-// LoadTablesColumns загружает колонки таблиц, включая типы и аттрибуты
-func (p *Parser) LoadTablesColumns(ctx context.Context, s *schema.Schema) error {
-	columns, err := queries.QueryColumns(ctx, p.conn.Conn, s.TableNames)
+// loadTablesColumns загружает колонки таблиц, включая типы и аттрибуты
+func (p *Parser) loadTablesColumns(ctx context.Context, s *schema.Schema) error {
+	columns, err := p.q.Columns(ctx, p.conn, s.TableNames)
 	if err != nil {
 		p.log.Error("failed to query tables columns", zap.Error(err))
 		return err
@@ -186,9 +200,9 @@ var pgConstraintType = map[string]schema.ConstraintType{
 	"x": schema.ConstraintTypeExclusion,
 }
 
-// LoadConstraints загружает ограничения для всех найденных таблиц
-func (p *Parser) LoadConstraints(ctx context.Context, s *schema.Schema) error {
-	constraints, err := queries.QueryTableConstraints(ctx, p.conn.Conn, s.TableNames)
+// loadConstraints загружает ограничения для всех найденных таблиц
+func (p *Parser) loadConstraints(ctx context.Context, s *schema.Schema) error {
+	constraints, err := p.q.TableConstraints(ctx, p.conn, s.TableNames)
 	if err != nil {
 		p.log.Error("failed to query tables constraints", zap.Error(err))
 		return err
@@ -239,8 +253,8 @@ func (p *Parser) LoadConstraints(ctx context.Context, s *schema.Schema) error {
 	return nil
 }
 
-func (p *Parser) LoadConstraintsColumns(ctx context.Context, s *schema.Schema, constraintNames []string) error {
-	constraintsColumns, err := queries.QueryConstraintColumns(ctx, p.conn.Conn, s.TableNames, constraintNames)
+func (p *Parser) loadConstraintsColumns(ctx context.Context, s *schema.Schema, constraintNames []string) error {
+	constraintsColumns, err := p.q.ConstraintColumns(ctx, p.conn, s.TableNames, constraintNames)
 	if err != nil {
 		p.log.Error("failed to query constraints columns", zap.Error(err))
 		return err
@@ -280,8 +294,8 @@ func (p *Parser) LoadConstraintsColumns(ctx context.Context, s *schema.Schema, c
 	return nil
 }
 
-func (p *Parser) LoadForeignConstraints(ctx context.Context, s *schema.Schema, constraintNames []string) error {
-	fks, err := queries.QueryForeignKeys(ctx, p.conn.Conn, constraintNames)
+func (p *Parser) loadForeignConstraints(ctx context.Context, s *schema.Schema, constraintNames []string) error {
+	fks, err := p.q.ForeignKeys(ctx, p.conn, constraintNames)
 	if err != nil {
 		p.log.Error("failed to query foreign constraints", zap.Error(err))
 		return err
@@ -318,12 +332,12 @@ func (p *Parser) LoadForeignConstraints(ctx context.Context, s *schema.Schema, c
 	return nil
 }
 
-func (p *Parser) LoadTypes(ctx context.Context, s *schema.Schema) error {
+func (p *Parser) loadTypes(ctx context.Context, s *schema.Schema) error {
 	var err error
 	loadTypes := mapKeys(s.Types)
 
 	for len(loadTypes) != 0 {
-		loadTypes, err = p.loadTypes(ctx, s, loadTypes)
+		loadTypes, err = p.loadTypesByNames(ctx, s, loadTypes)
 		if err != nil {
 			return fmt.Errorf("error loading types: %w", err)
 		}
@@ -332,12 +346,12 @@ func (p *Parser) LoadTypes(ctx context.Context, s *schema.Schema) error {
 	return nil
 }
 
-func (p *Parser) loadTypes(
+func (p *Parser) loadTypesByNames(
 	ctx context.Context,
 	s *schema.Schema,
 	typeNames []string,
 ) (moreTypes []string, err error) {
-	types, err := queries.QueryTypes(ctx, p.conn.Conn, typeNames)
+	types, err := p.q.Types(ctx, p.conn, typeNames)
 	if err != nil {
 		return nil, err
 	}
@@ -567,8 +581,8 @@ func (p *Parser) makeCompositeType(
 	}, nil
 }
 
-func (p *Parser) LoadEnums(ctx context.Context, s *schema.Schema) error {
-	enums, err := queries.QueryEnums(ctx, p.conn.Conn, mapKeys(s.EnumTypes))
+func (p *Parser) loadEnums(ctx context.Context, s *schema.Schema) error {
+	enums, err := p.q.Enums(ctx, p.conn, mapKeys(s.EnumTypes))
 	if err != nil {
 		p.log.Error("failed to query enums", zap.Error(err))
 		return err

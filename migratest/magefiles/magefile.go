@@ -3,18 +3,27 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	"github.com/magefile/mage/sh"
 )
 
-func UpdateTools() error {
-	return sh.Run("go", "get", "-u", "-v")
+func Update() error {
+	return sh.RunV("go", "get", "-u", "-v")
 }
 
 func InstallTools() error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	if filepath.Base(wd) != "tools" {
+		return fmt.Errorf("mage -w tools")
+	}
 	file, err := os.ReadFile("tools.go")
 	if err != nil {
 		return err

@@ -9,6 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+type Queries struct{}
+
 //go:embed sql/tables.sql
 var queryTablesSQL string
 
@@ -23,7 +25,7 @@ type TablesPattern struct {
 	Tables string
 }
 
-func QueryTables(ctx context.Context, exec Executor, p ...TablesPattern) ([]Tables, error) {
+func (Queries) Tables(ctx context.Context, exec Executor, p []TablesPattern) ([]Tables, error) {
 	var where string
 	var paramIndex int
 	var args []any
@@ -73,7 +75,7 @@ type Column struct {
 	CharacterMaxLength sql.NullInt32
 }
 
-func QueryColumns(ctx context.Context, exec Executor, tableNames []string) ([]Column, error) {
+func (Queries) Columns(ctx context.Context, exec Executor, tableNames []string) ([]Column, error) {
 	return QueryAll(
 		ctx, exec, queryColumnsSQL,
 		func(scan pgx.Rows, v *Column) error {
@@ -108,7 +110,7 @@ type TableConstraint struct {
 	ConstraintDef    string
 }
 
-func QueryTableConstraints(ctx context.Context, exec Executor, tableNames []string) ([]TableConstraint, error) {
+func (Queries) TableConstraints(ctx context.Context, exec Executor, tableNames []string) ([]TableConstraint, error) {
 	return QueryAll(
 		ctx, exec, queryTableConstraintsSQL,
 		func(scan pgx.Rows, v *TableConstraint) error {
@@ -124,50 +126,21 @@ func QueryTableConstraints(ctx context.Context, exec Executor, tableNames []stri
 		}, tableNames)
 }
 
-//go:embed sql/foreign_keys.sql
-var queryForeignKeysSQL string
-
-type ForeignKey struct {
-	ConstraintSchema       string
-	ConstraintName         string
-	UniqueConstraintSchema string
-	UniqueConstraintName   string
-	MatchOption            string
-	UpdateRule             string
-	DeleteRule             string
-}
-
-func QueryForeignKeys(ctx context.Context, exec Executor, constraintNames []string) ([]ForeignKey, error) {
-	return QueryAll(
-		ctx, exec, queryForeignKeysSQL,
-		func(scan pgx.Rows, v *ForeignKey) error {
-			err := scan.Scan(
-				&v.ConstraintSchema,
-				&v.ConstraintName,
-				&v.UniqueConstraintSchema,
-				&v.UniqueConstraintName,
-				&v.MatchOption,
-				&v.UpdateRule,
-				&v.DeleteRule,
-			)
-			if err != nil {
-				return err
-			}
-			return nil
-		}, constraintNames)
-}
-
 //go:embed sql/constraint_columns.sql
 var queryConstraintColumnsSQL string
 
-type ConstraintColumn struct {
+type ConstraintIdentifier struct {
+	OID            int
 	SchemaName     string
 	ConstraintName string
 	TableName      string
+}
+
+type ConstraintColumn struct {
 	ColumnName     string
 }
 
-func QueryConstraintColumns(
+func (Queries) ConstraintColumns(
 	ctx context.Context, exec Executor,
 	tableNames []string, constraintNames []string,
 ) ([]ConstraintColumn, error) {
@@ -204,7 +177,7 @@ type Type struct {
 	MultiRangeTypeName     sql.NullString
 }
 
-func QueryTypes(ctx context.Context, exec Executor, typeNames []string) ([]Type, error) {
+func (Queries) Types(ctx context.Context, exec Executor, typeNames []string) ([]Type, error) {
 	return QueryAll(
 		ctx, exec, querySelectTypesSQL,
 		func(scan pgx.Rows, v *Type) error {
@@ -240,7 +213,7 @@ type ArrayType struct {
 	ElemName   string
 }
 
-func QueryArrayTypes(ctx context.Context, exec Executor, arrayNames []string) ([]ArrayType, error) {
+func (Queries) ArrayTypes(ctx context.Context, exec Executor, arrayNames []string) ([]ArrayType, error) {
 	return QueryAll(
 		ctx, exec, queryArrayTypesSQL,
 		func(scan pgx.Rows, v *ArrayType) error {
@@ -261,7 +234,7 @@ type Enum struct {
 	EnumValues []string
 }
 
-func QueryEnums(ctx context.Context, exec Executor, enums []string) ([]Enum, error) {
+func (Queries) Enums(ctx context.Context, exec Executor, enums []string) ([]Enum, error) {
 	return QueryAll(
 		ctx, exec, querySelectEnumsSQL,
 		func(scan pgx.Rows, v *Enum) error {

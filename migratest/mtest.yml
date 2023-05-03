@@ -1,5 +1,5 @@
-dbconn: "postgresql://postgres:postgres@localhost:5432?sslmode=disable"
+dbconn: "postgresql://postgres:postgres@localhost:5432/delme"
 parser:
   # - pg_catalog
-  - test
+  # - test
   - public

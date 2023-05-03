@@ -29,7 +29,6 @@
   {{- end}}
 {{- end}}
 
-
 {{- /* range tables */}}
 {{- range .Schema.Tables}}
 {{- $table := .}}
@@ -69,7 +68,7 @@ class {{$table.Name}} {
   {{- end}}{{end}}
 }
 {{/* range tables */}}
-{{end}}
+{{- end}}
 
 {{- range $childName, $relations := .Grapth}}
 {{- $child := index $.Schema.Tables $childName}}
