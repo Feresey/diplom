@@ -46,7 +46,7 @@ func (Queries) Tables(ctx context.Context, exec Executor, p []TablesPattern) ([]
 	}
 
 	return QueryAll(
-		ctx, exec, fmt.Sprintf("%s AND (%s) ORDER BY ", queryTablesSQL, where),
+		ctx, exec, fmt.Sprintf("%s AND (%s) ORDER BY c.oid ASC", queryTablesSQL, where),
 		func(scan pgx.Rows, v *Tables) error {
 			return scan.Scan(
 				&v.OID,

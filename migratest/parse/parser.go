@@ -112,7 +112,7 @@ func (p *Parser) loadTables(ctx context.Context, s *schema.Schema, patterns []qu
 		s.Tables[table.Name.String()] = table
 		s.TableNames = append(s.TableNames, table.Name.String())
 		if len(s.Tables) != len(s.TableNames) {
-			return fmt.Errorf("duplicated tables")
+			return fmt.Errorf("duplicated tables: %q", table.Name)
 		}
 	}
 
@@ -162,8 +162,8 @@ func (p *Parser) loadTablesColumns(ctx context.Context, s *schema.Schema) error 
 				Default:    dbcolumn.DefaultExpr.String,
 				DomainAttributes: schema.DomainAttributes{
 					NotNullable:      dbcolumn.IsNullable,
-					CharMaxLength:    int(dbcolumn.CharacterMaxLength.Int32),
 					HasCharMaxLength: dbcolumn.CharacterMaxLength.Valid,
+					CharMaxLength:    int(dbcolumn.CharacterMaxLength.Int32),
 					ArrayDims:        dbcolumn.ArrayDims,
 				},
 			},

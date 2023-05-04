@@ -21,6 +21,10 @@
       {{- end}}
   {{- else}}
       {{- $type.TypeName.String}}
+      {{- if $column.Attributes.HasCharMaxLength -}}
+      ({{$column.Attributes.CharMaxLength}})
+      {{- end}}
+      {{- repeat $column.Attributes.ArrayDims "[]"}}
   {{- /* if array */}}
   {{- end}}
   {{- with .Attributes}}
