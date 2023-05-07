@@ -18,7 +18,6 @@ func TestTypes(t *testing.T) {
 		columns []queries.Column
 		tc      []queries.Constraint
 		types   []queries.Type
-		enums   []queries.Enum
 	}{
 		{
 			name:    "simple",
@@ -41,7 +40,6 @@ func TestTypes(t *testing.T) {
 			q.EXPECT().Columns(mock.Anything, mock.Anything, mock.Anything).Return(tt.columns, nil)
 			q.EXPECT().Constraints(mock.Anything, mock.Anything, mock.Anything).Return(tt.tc, nil)
 			q.EXPECT().Types(mock.Anything, mock.Anything, mock.Anything).Return(tt.types, nil)
-			q.EXPECT().Enums(mock.Anything, mock.Anything, mock.Anything).Return(tt.enums, nil)
 
 			p := Parser{
 				conn: nil,

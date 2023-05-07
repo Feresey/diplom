@@ -33,7 +33,6 @@ type Queries interface {
 	Columns(context.Context, queries.Executor, []string) ([]queries.Column, error)
 	Constraints(context.Context, queries.Executor, []string) ([]queries.Constraint, error)
 	Types(context.Context, queries.Executor, []string) ([]queries.Type, error)
-	Enums(context.Context, queries.Executor, []string) ([]queries.Enum, error)
 }
 
 func NewParser(
@@ -78,9 +77,6 @@ func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, e
 
 	if err := p.loadTypes(ctx, s); err != nil {
 		return nil, fmt.Errorf("load types: %w", err)
-	}
-	if err := p.loadEnums(ctx, s); err != nil {
-		return nil, fmt.Errorf("load enums: %w", err)
 	}
 	return s, nil
 }
@@ -422,7 +418,7 @@ func (p *Parser) fillType(
 	case schema.DataTypeArray:
 		moreTypes, typ.ArrayType, err = p.makeArrayType(s, typ.TypeName, dbtype)
 	case schema.DataTypeEnum:
-		typ.EnumType, err = p.makeEnumType(s, typ.TypeName)
+		typ.EnumType, err = p.makeEnumType(s, typ.TypeName, dbtype)
 	case schema.DataTypeRange:
 		moreTypes, typ.RangeType, err = p.makeRangeType(s, typ.TypeName, dbtype)
 	case schema.DataTypeComposite:
@@ -511,6 +507,7 @@ func (p *Parser) makeArrayType(
 func (p *Parser) makeEnumType(
 	s *schema.Schema,
 	enumTypeName schema.Identifier,
+	dbtype *queries.Type,
 ) (enum *schema.EnumType, err error) {
 	enum, ok := s.EnumTypes[enumTypeName.String()]
 	if ok {
@@ -522,6 +519,7 @@ func (p *Parser) makeEnumType(
 
 	return &schema.EnumType{
 		TypeName: enumTypeName,
+		Values:   dbtype.EnumValues,
 	}, nil
 }
 
@@ -577,28 +575,6 @@ func (p *Parser) makeCompositeType(
 		// TODO а что мне делать с композитами?
 		Attributes: make(map[string]*schema.CompositeAttribute),
 	}, nil
-}
-
-func (p *Parser) loadEnums(ctx context.Context, s *schema.Schema) error {
-	enums, err := p.q.Enums(ctx, p.conn, mapKeys(s.EnumTypes))
-	if err != nil {
-		p.log.Error("failed to query enums", zap.Error(err))
-		return err
-	}
-
-	for _, dbenum := range enums {
-		enumName := schema.Identifier{
-			Schema: dbenum.SchemaName,
-			Name:   dbenum.EnumName,
-		}
-		enum, ok := s.EnumTypes[enumName.String()]
-		if !ok {
-			return fmt.Errorf("enum %q not found", enumName.String())
-		}
-		enum.Values = dbenum.EnumValues
-	}
-
-	return nil
 }
 
 func mapKeys[V any](m map[string]V) (keys []string) {

@@ -2,7 +2,7 @@ package schema
 
 type Graph struct {
 	Schema *Schema
-	Grapth map[string]map[string]*Table
+	Graph  map[string]map[string]*Table
 }
 
 func NewGraph(schema *Schema) *Graph {
@@ -14,10 +14,10 @@ func NewGraph(schema *Schema) *Graph {
 }
 
 func (g *Graph) build() {
-	g.Grapth = make(map[string]map[string]*Table, len(g.Schema.Tables))
+	g.Graph = make(map[string]map[string]*Table, len(g.Schema.Tables))
 	for tablename, table := range g.Schema.Tables {
 		foreignTables := make(map[string]*Table, len(table.ForeignKeys))
-		g.Grapth[tablename] = foreignTables
+		g.Graph[tablename] = foreignTables
 		for _, fk := range table.ForeignKeys {
 			foreignTables[fk.Reference.Name.String()] = fk.Reference
 		}

@@ -146,7 +146,7 @@ func (Queries) Constraints(ctx context.Context, exec Executor, tableNames []stri
 		}, tableNames)
 }
 
-//go:embed sql/types/types.sql
+//go:embed sql/types.sql
 var querySelectTypesSQL string
 
 type Type struct {
@@ -165,6 +165,7 @@ type Type struct {
 	RangeElementTypeName   sql.NullString
 	MultiRangeTypeSchema   sql.NullString
 	MultiRangeTypeName     sql.NullString
+	EnumValues             []string
 }
 
 func (Queries) Types(ctx context.Context, exec Executor, typeNames []string) ([]Type, error) {
@@ -190,27 +191,8 @@ func (Queries) Types(ctx context.Context, exec Executor, typeNames []string) ([]
 				&v.RangeElementTypeName,
 				&v.MultiRangeTypeSchema,
 				&v.MultiRangeTypeName,
-			)
-		}, typeNames)
-}
 
-//go:embed sql/types/enum.sql
-var querySelectEnumsSQL string
-
-type Enum struct {
-	SchemaName string
-	EnumName   string
-	EnumValues []string
-}
-
-func (Queries) Enums(ctx context.Context, exec Executor, enums []string) ([]Enum, error) {
-	return QueryAll(
-		ctx, exec, querySelectEnumsSQL,
-		func(scan pgx.Rows, v *Enum) error {
-			return scan.Scan(
-				&v.SchemaName,
-				&v.EnumName,
 				&v.EnumValues,
 			)
-		}, enums)
+		}, typeNames)
 }

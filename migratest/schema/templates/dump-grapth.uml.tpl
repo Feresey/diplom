@@ -74,7 +74,7 @@ class {{$table.Name}} {
 {{/* range tables */}}
 {{- end}}
 
-{{- range $childName, $relations := .Grapth}}
+{{- range $childName, $relations := .Graph}}
 {{- $child := index $.Schema.Tables $childName}}
 {{- range $parentName, $parent := $relations}}
 {{$parent.Name}} --{ {{$child.Name}}
