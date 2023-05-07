@@ -78,6 +78,7 @@ type Column struct {
 //go:generate enumer -type DataType -trimprefix DataType
 type DataType int
 
+//nolint:lll // data type
 const (
 	DataTypeUndefined  DataType = iota
 	DataTypeBase                // встроенные базовые типы. INT, BOOL, DATE, TEXT, INET, CIDR

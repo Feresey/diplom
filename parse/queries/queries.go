@@ -148,7 +148,11 @@ type Constraint struct {
 	ForeignColumns    []sql.NullString
 }
 
-func (Queries) Constraints(ctx context.Context, exec Executor, tableNames []string) ([]Constraint, error) {
+func (Queries) Constraints(
+	ctx context.Context,
+	exec Executor,
+	tableNames []string,
+) ([]Constraint, error) {
 	return QueryAll(
 		ctx, exec,
 		func(scan pgx.Rows, v *Constraint) error {

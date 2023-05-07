@@ -48,7 +48,8 @@ func NewParser(
 }
 
 // TODO вернуть ошибку если данные ссылаются на не указанную схему
-// TODO как ограничивать внутри схемы таблицы, которые будут обрабатываться? Или на этом этапе это неважно?
+// TODO как ограничивать внутри схемы таблицы, которые будут обрабатываться?
+// TODO Или на этом этапе это неважно?
 func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, error) {
 	s := &schema.Schema{
 		Types:          make(map[string]*schema.DBType),
@@ -87,7 +88,11 @@ func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, e
 }
 
 // loadTables получает имена таблиц, найденных в схемах
-func (p *Parser) loadTables(ctx context.Context, s *schema.Schema, patterns []queries.TablesPattern) error {
+func (p *Parser) loadTables(
+	ctx context.Context,
+	s *schema.Schema,
+	patterns []queries.TablesPattern,
+) error {
 	tables, err := p.q.Tables(ctx, p.conn, patterns)
 	if err != nil {
 		p.log.Error("failed to query tables", zap.Error(err))
@@ -193,8 +198,6 @@ var pgConstraintType = map[string]schema.ConstraintType{
 }
 
 // loadConstraints загружает ограничения для всех найденных таблиц
-//
-//nolint:dupl // fp
 func (p *Parser) loadConstraints(ctx context.Context, s *schema.Schema) error {
 	constraints, err := p.q.Constraints(ctx, p.conn, s.TableNames)
 	if err != nil {
@@ -282,7 +285,10 @@ func (p *Parser) makeConstraint(
 	return nil
 }
 
-func (p *Parser) checkTableColumns(columns []string, table *schema.Table) (map[string]*schema.Column, error) {
+func (p *Parser) checkTableColumns(
+	columns []string,
+	table *schema.Table,
+) (map[string]*schema.Column, error) {
 	cols := make(map[string]*schema.Column, len(columns))
 	for _, column := range columns {
 		tcol, ok := table.Columns[column]
@@ -334,7 +340,6 @@ func (p *Parser) makeForeignConstraint(
 	return fk, nil
 }
 
-//nolint:dupl // fp
 func (p *Parser) loadIndexes(ctx context.Context, s *schema.Schema) error {
 	indexes, err := p.q.Indexes(ctx, p.conn, s.TableNames, mapKeys(s.Constraints))
 	if err != nil {

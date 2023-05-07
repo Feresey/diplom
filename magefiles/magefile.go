@@ -22,7 +22,7 @@ func InstallTools() error {
 		return err
 	}
 	if filepath.Base(wd) != "tools" {
-		return fmt.Errorf("mage -w tools")
+		return fmt.Errorf("mage -w tools installTools")
 	}
 	file, err := os.ReadFile("tools.go")
 	if err != nil {
