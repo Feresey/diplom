@@ -15,7 +15,7 @@ SELECT
 	-- range types
 	rst_ns.nspname AS range_element_type_schema,
 	rst.typname    AS range_element_type_name,
-	rmt_ns.nspname AS range_multi_element_type_schema,
+	rmt_ns.nspname AS range_multi_type_schema,
 	rmt.typname    AS range_multi_type_name,
 	-- enum types
 	(SELECT
@@ -36,7 +36,7 @@ FROM
 	pg_type t
 	JOIN pg_namespace ns          ON t.typnamespace = ns.oid
 	LEFT JOIN pg_type et          ON t.typelem = et.oid
-	LEFT JOIN pg_namespace et_ns   ON et.typnamespace = et_ns.oid
+	LEFT JOIN pg_namespace et_ns  ON et.typnamespace = et_ns.oid
 	LEFT JOIN pg_type dt          ON t.typbasetype = dt.oid
 	LEFT JOIN pg_namespace nd     ON dt.typnamespace = nd.oid
 	LEFT JOIN pg_range rng        ON rng.rngtypid = t.oid
