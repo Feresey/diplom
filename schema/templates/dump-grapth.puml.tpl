@@ -102,9 +102,9 @@ class {{$table.Name}} {
 {{/* range tables */}}
 {{- end}}
 
-{{- range $childName, $relations := .Graph}}
-{{- $child := index $.Schema.Tables $childName}}
-{{- range $parentName, $parent := $relations}}
+{{- range $parentName, $relations := .Graph}}
+{{- $parent := index $.Schema.Tables $parentName}}
+{{- range $child := $relations}}
 {{$parent.Name}} --{ {{$child.Name}}
 {{- end}}
 {{- end}}

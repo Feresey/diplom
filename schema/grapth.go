@@ -2,7 +2,8 @@ package schema
 
 type Graph struct {
 	Schema *Schema
-	Graph  map[string]map[string]*Table
+	// map[текущая_таблица][таблицы_для_которых_текущая_это_внешняя]внешняя_таблица
+	Graph map[string]map[string]*Table
 }
 
 func NewGraph(schema *Schema) *Graph {
@@ -19,7 +20,7 @@ func (g *Graph) build() {
 		foreignTables := make(map[string]*Table, len(table.ForeignKeys))
 		g.Graph[tablename] = foreignTables
 		for _, fk := range table.ForeignKeys {
-			foreignTables[fk.Reference.Name.String()] = fk.Reference
+			foreignTables[fk.Foreign.Table.Name.String()] = fk.Reference
 		}
 	}
 }
