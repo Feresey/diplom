@@ -1,3 +1,14 @@
 {
-    "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools"
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "laptop",
+            "username": "postgres",
+            "password": "postgres",
+            "database": "delme-2"
+        }
+    ]
 }
