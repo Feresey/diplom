@@ -32,8 +32,8 @@ func (e Error) Pretty() string {
 func QueryAll[T any](
 	ctx context.Context,
 	exec Executor,
-	query string,
 	scan func(s pgx.Rows, q *T) error,
+	query string,
 	args ...any,
 ) ([]T, error) {
 	rows, err := exec.Query(ctx, query, args...)

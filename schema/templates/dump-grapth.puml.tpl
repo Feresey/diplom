@@ -29,7 +29,13 @@
   {{- end}}
   {{- with .Attributes}}
     {{- if .NotNullable}} NOT NULL{{end}}
-    {{- if .HasDefault}} DEFAULT {{.Default}}{{end}}
+    {{- if .HasDefault}}
+      {{- if .IsGenerated}} GENERATED ALWAYS
+      {{- else}} DEFAULT
+      {{- end}}
+      {{- " "}}{{.Default}}
+      {{- if .IsGenerated}} STORED{{end}}
+    {{- end}}
   {{- end}}
 {{- end}}
 
@@ -70,6 +76,28 @@ class {{$table.Name}} {
     {{- end}}
   {{- /* range columns */}}
   {{- end}}{{end}}
+  --
+{{- /* range constraints */}}
+{{- range $table.Constraints }}
+  {{- $t := .Type.String}}
+  {{- if eq $t "PK"}}
+  {{- else if eq $t "FK"}}
+  {{- else}}
+  **{{.Name}}**: CONSTRAINT {{$t | upper}} ({{.Columns | columnNames}})
+  {{- end}}
+  {{- if eq $t "Unique"}}
+    {{- with .Index}}{{if .IsNullsNotDistinct}} NULLS NOT DISTINCT{{end}}{{end}}
+  {{- else if eq $t "Check" }}
+    {{- ""}} {{.Definition}}
+  {{- end}}
+{{- /* range constraints */}}
+{{- end}}
+  --
+{{- /* range indexes */}}
+{{- range $table.Indexes }}
+  **{{.Name}}**: {{.Definition}}
+{{- /* range indexes */}}
+{{- end}}
 }
 {{/* range tables */}}
 {{- end}}

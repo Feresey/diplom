@@ -5,14 +5,12 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
 
 type Queries struct{}
-
-//go:embed sql/tables.sql
-var queryTablesSQL string
 
 type Tables struct {
 	OID    int
@@ -25,35 +23,64 @@ type TablesPattern struct {
 	Tables string
 }
 
+type queryBuiler struct {
+	queries []string
+	argnum  int
+	args    []any
+}
+
+func (q *queryBuiler) NextArgNum() int {
+	q.argnum++
+	return q.argnum
+}
+
+func (q *queryBuiler) Append(query string, args ...any) {
+	q.queries = append(q.queries, query)
+	q.args = append(q.args, args...)
+}
+
 func (Queries) Tables(ctx context.Context, exec Executor, p []TablesPattern) ([]Tables, error) {
-	var where string
-	var paramIndex int
-	var args []any
+	const queryTablesSQL = `-- list tables
+SELECT
+	c.oid::INT AS table_oid,
+	ns.nspname AS schema_name,
+	c.relname AS table_name
+FROM
+	pg_class c
+	JOIN pg_namespace ns ON ns.oid = c.relnamespace
+WHERE
+	c.relkind = 'r'`
+
+	var qb queryBuiler
+
 	for _, pattern := range p {
-		paramIndex++
-		args = append(args, pattern.Schema)
+		args := []any{pattern.Schema}
+		paramIndex := qb.NextArgNum()
 		schema := fmt.Sprintf("ns.nspname LIKE $%d", paramIndex)
 		if pattern.Tables != "" {
-			paramIndex++
 			args = append(args, pattern.Tables)
+			paramIndex := qb.NextArgNum()
 			schema = fmt.Sprintf("%s AND c.relname LIKE $%d", schema, paramIndex)
 		}
 
-		if where != "" {
-			where += " OR "
-		}
-		where += schema
+		qb.Append(schema, args...)
 	}
 
 	return QueryAll(
-		ctx, exec, fmt.Sprintf("%s AND (%s) ORDER BY c.oid ASC", queryTablesSQL, where),
+		ctx, exec,
 		func(scan pgx.Rows, v *Tables) error {
 			return scan.Scan(
 				&v.OID,
 				&v.Schema,
 				&v.Table,
 			)
-		}, args...)
+		},
+		fmt.Sprintf(
+			"%s AND (%s) ORDER BY c.oid ASC",
+			queryTablesSQL,
+			strings.Join(qb.queries, " OR "),
+		),
+		qb.args...)
 }
 
 //go:embed sql/columns.sql
@@ -77,7 +104,7 @@ type Column struct {
 
 func (Queries) Columns(ctx context.Context, exec Executor, tableNames []string) ([]Column, error) {
 	return QueryAll(
-		ctx, exec, queryColumnsSQL,
+		ctx, exec,
 		func(scan pgx.Rows, v *Column) error {
 			return scan.Scan(
 				&v.SchemaName,
@@ -94,7 +121,8 @@ func (Queries) Columns(ctx context.Context, exec Executor, tableNames []string) 
 				&v.DefaultExpr,
 				&v.CharacterMaxLength,
 			)
-		}, tableNames)
+		},
+		queryColumnsSQL, tableNames)
 }
 
 //go:embed sql/constraints.sql
@@ -122,7 +150,7 @@ type Constraint struct {
 
 func (Queries) Constraints(ctx context.Context, exec Executor, tableNames []string) ([]Constraint, error) {
 	return QueryAll(
-		ctx, exec, queryTableConstraintsSQL,
+		ctx, exec,
 		func(scan pgx.Rows, v *Constraint) error {
 			return scan.Scan(
 				&v.SchemaName,
@@ -143,7 +171,8 @@ func (Queries) Constraints(ctx context.Context, exec Executor, tableNames []stri
 				&v.ForeignTableName,
 				&v.ForeignColumns,
 			)
-		}, tableNames)
+		},
+		queryTableConstraintsSQL, tableNames)
 }
 
 //go:embed sql/types.sql
@@ -170,7 +199,7 @@ type Type struct {
 
 func (Queries) Types(ctx context.Context, exec Executor, typeNames []string) ([]Type, error) {
 	return QueryAll(
-		ctx, exec, querySelectTypesSQL,
+		ctx, exec,
 		func(scan pgx.Rows, v *Type) error {
 			return scan.Scan(
 				&v.SchemaName,
@@ -194,5 +223,61 @@ func (Queries) Types(ctx context.Context, exec Executor, typeNames []string) ([]
 
 				&v.EnumValues,
 			)
-		}, typeNames)
+		},
+		querySelectTypesSQL, typeNames)
+}
+
+//go:embed sql/indexes.sql
+var queryIndexesSQL string
+
+type Index struct {
+	TableOID    int
+	TableSchema string
+	TableName   string
+
+	IndexOID    int
+	IndexSchema string
+	IndexName   string
+
+	ConstraintOID    sql.NullInt32
+	ConstraintSchema sql.NullString
+	ConstraintName   sql.NullString
+
+	IsUnique           bool
+	IsPrimary          bool
+	IsNullsNotDistinct bool
+	Columns            []string
+	IndexDefinition    string
+}
+
+func (Queries) Indexes(
+	ctx context.Context,
+	exec Executor,
+	tableNames []string,
+	constraints []string,
+) ([]Index, error) {
+	return QueryAll(
+		ctx, exec,
+		func(scan pgx.Rows, v *Index) error {
+			return scan.Scan(
+				&v.TableOID,
+				&v.TableSchema,
+				&v.TableName,
+
+				&v.IndexOID,
+				&v.IndexSchema,
+				&v.IndexName,
+
+				&v.ConstraintOID,
+				&v.ConstraintSchema,
+				&v.ConstraintName,
+
+				&v.IsUnique,
+				&v.IsPrimary,
+				&v.IsNullsNotDistinct,
+				&v.Columns,
+				&v.IndexDefinition,
+			)
+		},
+		queryIndexesSQL, tableNames, constraints)
 }

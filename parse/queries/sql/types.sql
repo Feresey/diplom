@@ -25,7 +25,7 @@ SELECT
 		) AS enum_values
 	FROM
 		pg_type t
-		JOIN pg_enum e ON t.oid = e.enumtypid
+		JOIN pg_enum      e ON t.oid = e.enumtypid
 		JOIN pg_namespace n ON n.oid = t.typnamespace
 	WHERE
 		n.nspname || '.' || t.typname = ANY($1)
@@ -34,15 +34,15 @@ SELECT
 	) AS enum_values
 FROM
 	pg_type t
-	JOIN pg_namespace ns          ON t.typnamespace = ns.oid
-	LEFT JOIN pg_type et          ON t.typelem = et.oid
-	LEFT JOIN pg_namespace et_ns  ON et.typnamespace = et_ns.oid
-	LEFT JOIN pg_type dt          ON t.typbasetype = dt.oid
-	LEFT JOIN pg_namespace nd     ON dt.typnamespace = nd.oid
-	LEFT JOIN pg_range rng        ON rng.rngtypid = t.oid
-	LEFT JOIN pg_type rst         ON rng.rngsubtype = rst.oid
-	LEFT JOIN pg_namespace rst_ns ON rst.typnamespace = rst_ns.oid
-	LEFT JOIN pg_type rmt         ON rng.rngmultitypid = rmt.oid
-	LEFT JOIN pg_namespace rmt_ns ON rmt.typnamespace = rmt_ns.oid
+	     JOIN pg_namespace ns     ON ns.oid     =   t.typnamespace
+	LEFT JOIN pg_type      et     ON et.oid     =   t.typelem
+	LEFT JOIN pg_namespace et_ns  ON et_ns.oid  =  et.typnamespace
+	LEFT JOIN pg_type      dt     ON dt.oid     =   t.typbasetype
+	LEFT JOIN pg_namespace nd     ON nd.oid     =  dt.typnamespace
+	LEFT JOIN pg_range     rng    ON t.oid      = rng.rngtypid
+	LEFT JOIN pg_type      rst    ON rst.oid    = rng.rngsubtype
+	LEFT JOIN pg_namespace rst_ns ON rst_ns.oid = rst.typnamespace
+	LEFT JOIN pg_type      rmt    ON rmt.oid    = rng.rngmultitypid
+	LEFT JOIN pg_namespace rmt_ns ON rmt_ns.oid = rmt.typnamespace
 WHERE
 	ns.nspname || '.' || t.typname = ANY($1)

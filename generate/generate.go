@@ -21,5 +21,6 @@ func (g *Generator) Generate() error {
 }
 
 func (g *Generator) buildTablesInsertOrder() ([]string, error) {
-	g.g.Graph[]
+	// g.g.Graph[]
+	return nil, nil
 }

@@ -17,9 +17,9 @@ var dumptpl embed.FS
 type TemplateName string
 
 const (
-	DumpSchemaTemplate TemplateName = "dump-schema.tpl"
+	DumpSchemaTemplate TemplateName = "dump-schema.sql.tpl"
 	DumpTypesTemplate  TemplateName = "dump-types.tpl"
-	DumpGrapthTemplate TemplateName = "dump-grapth.uml.tpl"
+	DumpGrapthTemplate TemplateName = "dump-grapth.puml.tpl"
 )
 
 func (g *Graph) Dump(w io.Writer, tplName TemplateName) error {

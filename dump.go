@@ -98,7 +98,7 @@ func parseSchema(
 
 	slog := log.Sugar()
 
-	schemaDumpPath := filepath.Join(dumpPath, "schema.txt")
+	schemaDumpPath := filepath.Join(dumpPath, "schema.sql")
 	slog.Infof("dump schema to %q", schemaDumpPath)
 	if err := dumpToFile(schemaDumpPath, g, schema.DumpSchemaTemplate); err != nil {
 		return fmt.Errorf("failed to dump schema: %w", err)
@@ -110,7 +110,7 @@ func parseSchema(
 		return fmt.Errorf("failed to dump types: %w", err)
 	}
 
-	graphDumpPath := filepath.Join(dumpPath, "graph.uml")
+	graphDumpPath := filepath.Join(dumpPath, "graph.puml")
 	slog.Infof("dump graph to %q", graphDumpPath)
 	if err := dumpToFile(graphDumpPath, g, schema.DumpGrapthTemplate); err != nil {
 		return fmt.Errorf("failed to dump grapth: %w", err)

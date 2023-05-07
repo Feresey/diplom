@@ -134,6 +134,63 @@ func (_c *MockQueries_Constraints_Call) RunAndReturn(run func(context.Context, q
 	return _c
 }
 
+// Indexes provides a mock function with given fields: _a0, _a1, _a2, _a3
+func (_m *MockQueries) Indexes(_a0 context.Context, _a1 queries.Executor, _a2 []string, _a3 []string) ([]queries.Index, error) {
+	ret := _m.Called(_a0, _a1, _a2, _a3)
+
+	var r0 []queries.Index
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []string, []string) ([]queries.Index, error)); ok {
+		return rf(_a0, _a1, _a2, _a3)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []string, []string) []queries.Index); ok {
+		r0 = rf(_a0, _a1, _a2, _a3)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]queries.Index)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, queries.Executor, []string, []string) error); ok {
+		r1 = rf(_a0, _a1, _a2, _a3)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQueries_Indexes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Indexes'
+type MockQueries_Indexes_Call struct {
+	*mock.Call
+}
+
+// Indexes is a helper method to define mock.On call
+//   - _a0 context.Context
+//   - _a1 queries.Executor
+//   - _a2 []string
+//   - _a3 []string
+func (_e *MockQueries_Expecter) Indexes(_a0 interface{}, _a1 interface{}, _a2 interface{}, _a3 interface{}) *MockQueries_Indexes_Call {
+	return &MockQueries_Indexes_Call{Call: _e.mock.On("Indexes", _a0, _a1, _a2, _a3)}
+}
+
+func (_c *MockQueries_Indexes_Call) Run(run func(_a0 context.Context, _a1 queries.Executor, _a2 []string, _a3 []string)) *MockQueries_Indexes_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(queries.Executor), args[2].([]string), args[3].([]string))
+	})
+	return _c
+}
+
+func (_c *MockQueries_Indexes_Call) Return(_a0 []queries.Index, _a1 error) *MockQueries_Indexes_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQueries_Indexes_Call) RunAndReturn(run func(context.Context, queries.Executor, []string, []string) ([]queries.Index, error)) *MockQueries_Indexes_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Tables provides a mock function with given fields: _a0, _a1, _a2
 func (_m *MockQueries) Tables(_a0 context.Context, _a1 queries.Executor, _a2 []queries.TablesPattern) ([]queries.Tables, error) {
 	ret := _m.Called(_a0, _a1, _a2)

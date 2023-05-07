@@ -1,7 +1,7 @@
 {{- /* range tables */}}
 {{- range .TableNames }}
 {{- $table := index $.Tables .}}
-TABLE {{$table.Name}} (
+CREATE TABLE {{$table.Name}} (
 {{- /* range columns */}}
 {{- $maxlen := 0}}{{range $table.ColumnNames}}{{if gt (len .) $maxlen}}{{$maxlen = len .}}{{end}}{{end}}
 {{- range $table.ColumnNames }}{{$column := index $table.Columns .}}
@@ -33,7 +33,13 @@ TABLE {{$table.Name}} (
     {{- /* with attributes */}}
     {{- with $column.Attributes}}
         {{- if .NotNullable}} NOT NULL{{end}}
-        {{- if .HasDefault}} DEFAULT {{.Default}}{{end}}
+        {{- if .HasDefault}}
+            {{- if .IsGenerated}} GENERATED ALWAYS
+            {{- else}} DEFAULT
+            {{- end}}
+            {{- " "}}{{.Default}}
+            {{- if .IsGenerated}} STORED{{end}}
+        {{- end}}
     {{- /* with attributes */}}
     {{- end}}
     {{- /* range foreign keys */}}
@@ -59,10 +65,16 @@ TABLE {{$table.Name}} (
     CONSTRAINT {{$t | upper}} {{.Name}} ({{.Columns | columnNames}})
     {{- end}}
     {{- if eq $t "Unique"}}
-        {{- if .NullsNotDistinct}} NULLS NOT DISTINCT{{end}}
+        {{- with .Index}}{{if .IsNullsNotDistinct}} NULLS NOT DISTINCT{{end}}{{end}}
     {{- else if eq $t "Check" }}
         {{- ""}} {{.Definition}}
     {{- end}}
+{{- /* range constraints */}}
 {{- end}}
 );
+{{- /* range indexes */}}
+{{- range $table.Indexes }}
+{{.Definition}};
+{{- /* range indexes */}}
+{{- end}}
 {{/* range tables */}}{{end}}

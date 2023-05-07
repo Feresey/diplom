@@ -33,6 +33,7 @@ type Queries interface {
 	Columns(context.Context, queries.Executor, []string) ([]queries.Column, error)
 	Constraints(context.Context, queries.Executor, []string) ([]queries.Constraint, error)
 	Types(context.Context, queries.Executor, []string) ([]queries.Type, error)
+	Indexes(context.Context, queries.Executor, []string, []string) ([]queries.Index, error)
 }
 
 func NewParser(
@@ -58,6 +59,7 @@ func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, e
 		DomainTypes:    make(map[string]*schema.DomainType),
 		Tables:         make(map[string]*schema.Table),
 		Constraints:    make(map[string]*schema.Constraint),
+		Indexes:        make(map[string]*schema.Index),
 	}
 
 	patterns := make([]queries.TablesPattern, 0, len(conf.Patterns))
@@ -73,6 +75,9 @@ func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, e
 	}
 	if err := p.loadConstraints(ctx, s); err != nil {
 		return nil, fmt.Errorf("load constraints: %w", err)
+	}
+	if err := p.loadIndexes(ctx, s); err != nil {
+		return nil, fmt.Errorf("load indexes: %w", err)
 	}
 
 	if err := p.loadTypes(ctx, s); err != nil {
@@ -102,6 +107,7 @@ func (p *Parser) loadTables(ctx context.Context, s *schema.Schema, patterns []qu
 			Columns:      make(map[string]*schema.Column),
 			Constraints:  make(map[string]*schema.Constraint),
 			ForeignKeys:  make(map[string]*schema.ForeignKey),
+			Indexes:      make(map[string]*schema.Index),
 			ReferencedBy: make(map[string]*schema.Constraint),
 		}
 
@@ -154,8 +160,9 @@ func (p *Parser) loadTablesColumns(ctx context.Context, s *schema.Schema) error 
 			Table: table,
 			Type:  typ,
 			Attributes: schema.ColumnAttributes{
-				HasDefault: dbcolumn.HasDefault || dbcolumn.IsGenerated,
-				Default:    dbcolumn.DefaultExpr.String,
+				HasDefault:  dbcolumn.HasDefault,
+				IsGenerated: dbcolumn.IsGenerated,
+				Default:     dbcolumn.DefaultExpr.String,
 				DomainAttributes: schema.DomainAttributes{
 					NotNullable:      dbcolumn.IsNullable,
 					HasCharMaxLength: dbcolumn.CharacterMaxLength.Valid,
@@ -186,6 +193,8 @@ var pgConstraintType = map[string]schema.ConstraintType{
 }
 
 // loadConstraints загружает ограничения для всех найденных таблиц
+//
+//nolint:dupl // fp
 func (p *Parser) loadConstraints(ctx context.Context, s *schema.Schema) error {
 	constraints, err := p.q.Constraints(ctx, p.conn, s.TableNames)
 	if err != nil {
@@ -236,11 +245,10 @@ func (p *Parser) makeConstraint(
 	}
 
 	c := &schema.Constraint{
-		Name:             constraintName,
-		Table:            table,
-		Type:             typ,
-		NullsNotDistinct: dbconstraint.NullsNotDistinct,
-		Definition:       dbconstraint.ConstraintDef,
+		Name:       constraintName,
+		Table:      table,
+		Type:       typ,
+		Definition: dbconstraint.ConstraintDef,
 	}
 
 	cols, err := p.checkTableColumns(dbconstraint.Columns, table)
@@ -324,6 +332,84 @@ func (p *Parser) makeForeignConstraint(
 	fk.ReferenceColumns = cols
 
 	return fk, nil
+}
+
+//nolint:dupl // fp
+func (p *Parser) loadIndexes(ctx context.Context, s *schema.Schema) error {
+	indexes, err := p.q.Indexes(ctx, p.conn, s.TableNames, mapKeys(s.Constraints))
+	if err != nil {
+		p.log.Error("failed to query tables indexes", zap.Error(err))
+		return err
+	}
+	p.log.Debug("loaded indexes", zap.Int("n", len(indexes)))
+
+	// realloc
+	s.Indexes = make(map[string]*schema.Index, len(indexes))
+	for idx := range indexes {
+		if err := p.makeIndex(s, &indexes[idx]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *Parser) makeIndex(s *schema.Schema, dbindex *queries.Index) error {
+	indexName := schema.Identifier{
+		OID:    dbindex.IndexOID,
+		Schema: dbindex.IndexSchema,
+		Name:   dbindex.IndexName,
+	}
+	tableName := schema.Identifier{
+		OID:    dbindex.TableOID,
+		Schema: dbindex.TableSchema,
+		Name:   dbindex.TableName,
+	}
+
+	table, ok := s.Tables[tableName.String()]
+	if !ok {
+		return fmt.Errorf("table %q not found for index %q", tableName, indexName)
+	}
+	index, ok := s.Indexes[indexName.String()]
+	if !ok {
+		index = &schema.Index{
+			Name:       indexName,
+			Table:      table,
+			Definition: dbindex.IndexDefinition,
+
+			IsUnique:           dbindex.IsUnique,
+			IsPrimary:          dbindex.IsPrimary,
+			IsNullsNotDistinct: dbindex.IsNullsNotDistinct,
+		}
+		columns, err := p.checkTableColumns(dbindex.Columns, table)
+		if err != nil {
+			return fmt.Errorf("check table columns for index %q: %w", indexName, err)
+		}
+		index.Columns = columns
+		s.Indexes[indexName.String()] = index
+		table.Indexes[indexName.String()] = index
+	}
+
+	constraintName := schema.Identifier{
+		OID:    int(dbindex.ConstraintOID.Int32),
+		Schema: dbindex.ConstraintSchema.String,
+		Name:   dbindex.ConstraintName.String,
+	}
+	var constraint *schema.Constraint
+	if dbindex.ConstraintOID.Valid {
+		constraint, ok = s.Constraints[constraintName.String()]
+		if !ok {
+			return fmt.Errorf("constraint %q not found fot index %q for table %q",
+				constraintName,
+				indexName,
+				tableName,
+			)
+		}
+	}
+	if constraint != nil {
+		constraint.Index = index
+	}
+
+	return nil
 }
 
 func (p *Parser) loadTypes(ctx context.Context, s *schema.Schema) error {

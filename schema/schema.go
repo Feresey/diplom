@@ -21,8 +21,10 @@ type Schema struct {
 	EnumTypes      map[string]*EnumType
 	RangeTypes     map[string]*RangeType
 	DomainTypes    map[string]*DomainType
-	Tables         map[string]*Table
-	Constraints    map[string]*Constraint
+
+	Tables      map[string]*Table
+	Constraints map[string]*Constraint
+	Indexes     map[string]*Index
 	// имена том же порядке что и в базе
 	TableNames []string
 }
@@ -45,6 +47,8 @@ type Table struct {
 
 	// Список всех CONSTRAINT-ов текущей таблицы
 	Constraints map[string]*Constraint
+	// Список всех INDEX-ов текущей таблицы
+	Indexes map[string]*Index
 }
 
 // ForeignKey описывает внешнюю связь
@@ -149,8 +153,9 @@ type DomainAttributes struct {
 // ColumnAttributes описывает аттрибуты колонки
 type ColumnAttributes struct {
 	DomainAttributes
-	// Есть ли дефолтное значение (или GENERATED ALWAYS)
-	HasDefault bool
+
+	HasDefault  bool
+	IsGenerated bool
 	// Дефолтное значение
 	Default string
 }
@@ -174,10 +179,10 @@ type Constraint struct {
 	Name Identifier
 	// Тип ограничения
 	Type ConstraintType
-	// Только для UNIQUE индекса
-	NullsNotDistinct bool
 	// Таблица, которой принадлежит ограничение
 	Table *Table
+	// Индекс, на котором основано органичение (может быть пустым)
+	Index *Index
 
 	// Результат функции pg_getconstraintdef. Я не уверен что это вообще нужно, но пусть будет.
 	Definition string
@@ -187,4 +192,20 @@ type Constraint struct {
 	// Количество колонок всегда >= 1
 	// Ключ мапы - имя колонки
 	Columns map[string]*Column
+}
+
+type Index struct {
+	// Имя индекса
+	Name Identifier
+	// Таблица, для которой создан индекс
+	Table *Table
+	// Колонки, которые затрагивает индекс
+	Columns map[string]*Column
+	// Определение индекса
+	Definition string
+
+	IsUnique  bool
+	IsPrimary bool
+	// Только для UNIQUE индекса
+	IsNullsNotDistinct bool
 }
