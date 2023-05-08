@@ -22,7 +22,7 @@ SELECT
 			a.atttypmod
 		)
 	)::INT AS character_max_length,
-	a.atttypmod = 1700 AS is_numeric,
+	a.atttypid = 1700 AS is_numeric,
 	COALESCE(
 		information_schema._pg_numeric_precision(
 			information_schema._pg_truetypid(a.*, t.*),

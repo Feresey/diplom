@@ -2,7 +2,9 @@ package generate
 
 import (
 	"errors"
+	"fmt"
 	"sort"
+	"strconv"
 
 	"github.com/Feresey/mtest/schema"
 	"go.uber.org/zap"
@@ -33,20 +35,24 @@ func New(
 
 type Check struct {
 	Columns []*schema.Column
-	Values  []any
+	Values  []string
 }
 
 func (c *Check) AddColumn(col *schema.Column) {
 	c.Columns = append(c.Columns, col)
 }
 
-func (c *Check) AddValues(vals ...any) {
-	c.Values = append(c.Values, vals)
+func (c *Check) AddValues(vals ...string) {
+	c.Values = append(c.Values, vals...)
 }
 
-func (c *Check) AddValuesStrings(vals []string) {
+func (c *Check) AddValuesQuote(vals ...string) {
+	c.AddValuesProcess(strconv.Quote, vals...)
+}
+
+func (c *Check) AddValuesProcess(f func(string) string, vals ...string) {
 	for _, v := range vals {
-		c.Values = append(c.Values, v)
+		c.Values = append(c.Values, f(v))
 	}
 }
 
@@ -54,7 +60,7 @@ func (g *Generator) Generate() error {
 	for _, tableName := range g.order {
 		table := g.g.Schema.Tables[tableName]
 
-		g.genTableRules(table)
+		checks := g.genTableRules(table)
 	}
 	return nil
 }
@@ -62,27 +68,68 @@ func (g *Generator) Generate() error {
 func (g *Generator) genTableRules(table *schema.Table) []Check {
 	var checks []Check
 	for _, col := range table.Columns {
+		// TODO для FK колонок только брать значения
 		var check Check
 		check.AddColumn(col)
-		g.genColumnTypeChecks(&check, col)
+		g.genColumnChecks(&check, col)
 		if !col.Attributes.NotNullable {
-			check.AddValues("NULL")
+			check.AddValuesQuote("NULL")
+		}
+
+		if col.Type.TypeName.Name == "text" || Aliases[col.Type.TypeName.Name] == "text" {
+			if col.Attributes.HasCharMaxLength {
+				check.AddValues(fmt.Sprintf("makestrlen(%d)", col.Attributes.CharMaxLength))
+			}
 		}
 
 		checks = append(checks, check)
 	}
 
+
+	uniqueIndexes := make(map[string]*schema.Index)
+
+	for indexName, index := range table.Indexes {
+		if index.IsUnique {
+			uniqueIndexes[indexName] = index
+		}
+	}
+
+	// TODO для всех уникальных индексов
+	/*
+	1. для каждого индекса перебрать все возможные сочетания уникальных значений его колонок
+	2. каждое такое сочетание проверить на то что оно не нарушает этот индекс
+	3. если такого сочетания нет, то исключить этот индекс из перебора и перейти к шагу 1
+	4. если найдено такое сочетание то запомнить это сочетание и перейти к следующему индексу
+	5. для следующего индекса перебрать все возможные сочетания уникальных значений его колонок, за исключением выбранных колонок
+	6. если для следующего индекса такого сочетания нет, то вернуться к предыдущему индексу.
+	7. если предыдущего индекса нет, то исключить текущий индекс из перебора и перейти к шагу 1
+	8. если следующего индекса нет, выбранные значения колонок - собраны из значений колонок, которые уже есть в таблице.
+
+	*/
+	for _, index := range uniqueIndexes {
+
+	}
+
 	return checks
 }
 
-func (g *Generator) genColumnTypeChecks(check *Check, col *schema.Column) {
+func (g *Generator) baseTypesChecks(check *Check, typeName string) {
+	check.AddValuesQuote(Checks[Aliases[typeName]]...)
+	check.AddValuesQuote(Checks[typeName]...)
+}
+
+func (g *Generator) genColumnChecks(check *Check, col *schema.Column) {
 	switch col.Type.Type {
 	case schema.DataTypeBase:
-	col.Type.TypeName
+		g.baseTypesChecks(check, col.Type.TypeName.Name)
 	case schema.DataTypeArray:
+		// dims := col.Attributes.ArrayDims
 	case schema.DataTypeEnum:
-		check.AddValuesStrings(col.Type.EnumType.Values)
+		check.AddValuesProcess(func(s string) string {
+			return fmt.Sprintf("'%s'::%s", s, col.Type.EnumType.TypeName)
+		}, col.Type.EnumType.Values...)
 	case schema.DataTypeDomain:
+		g.baseTypesChecks(check, col.Type.DomainType.ElemType.TypeName.Name)
 	case schema.DataTypeComposite,
 		schema.DataTypeRange,
 		schema.DataTypeMultiRange,

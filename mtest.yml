@@ -1,5 +1,5 @@
 dbconn: "postgresql://postgres:postgres@localhost:5432"
 parser:
   # - pg_catalog
-  # - test
-  - public
+  - test
+  # - public
