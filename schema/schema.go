@@ -75,7 +75,7 @@ type Column struct {
 	Attributes ColumnAttributes
 }
 
-//go:generate enumer -type DataType -trimprefix DataType
+//go:generate enumer -type DataType -trimprefix DataType -json
 type DataType int
 
 //nolint:lll // data type
@@ -161,7 +161,7 @@ type ColumnAttributes struct {
 	Default string
 }
 
-//go:generate enumer -type ConstraintType -trimprefix ConstraintType
+//go:generate enumer -type ConstraintType -trimprefix ConstraintType -json
 type ConstraintType int
 
 const (

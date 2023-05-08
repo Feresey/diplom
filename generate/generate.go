@@ -9,27 +9,49 @@ import (
 )
 
 type Generator struct {
-	log *zap.Logger
-	g   *schema.Graph
+	log   *zap.Logger
+	g     *schema.Graph
+	order []string
 }
 
 func New(
 	log *zap.Logger,
-	g *schema.Graph,
-) *Generator {
-	return &Generator{
+	graph *schema.Graph,
+) (*Generator, error) {
+	g := &Generator{
 		log: log,
-		g:   g,
+		g:   graph,
+	}
+
+	order, err := g.TopologicalSort()
+	if err != nil {
+		return g, err
+	}
+	g.log.Info("tables insert order", zap.Strings("order", order))
+	return g, nil
+}
+
+type Check struct {
+	Columns []*schema.Column
+	Values  []any
+}
+
+func (c *Check) AddColumn(col *schema.Column) {
+	c.Columns = append(c.Columns, col)
+}
+
+func (c *Check) AddValues(vals ...any) {
+	c.Values = append(c.Values, vals)
+}
+
+func (c *Check) AddValuesStrings(vals []string) {
+	for _, v := range vals {
+		c.Values = append(c.Values, v)
 	}
 }
 
 func (g *Generator) Generate() error {
-	order, err := g.TopologicalSort()
-	if err != nil {
-		return err
-	}
-	g.log.Info("tables insert order", zap.Strings("order", order))
-	for _, tableName := range order {
+	for _, tableName := range g.order {
 		table := g.g.Schema.Tables[tableName]
 
 		g.genTableRules(table)
@@ -37,23 +59,38 @@ func (g *Generator) Generate() error {
 	return nil
 }
 
-func (g *Generator) genTableRules(table *schema.Table) {
+func (g *Generator) genTableRules(table *schema.Table) []Check {
+	var checks []Check
 	for _, col := range table.Columns {
-		g.genColumnChecks(col)
+		var c Check
+		c.AddColumn(col)
+		g.genColumnTypeChecks(&c, col)
+		g.genColumnAttributeChecks(&c, col)
+
+		checks = append(checks, c)
 	}
+
+	return checks
 }
 
-func (g *Generator) genColumnChecks(col *schema.Column) {
+func (g *Generator) genColumnTypeChecks(check *Check, col *schema.Column) {
 	switch col.Type.Type {
 	case schema.DataTypeBase:
 	case schema.DataTypeArray:
 	case schema.DataTypeEnum:
+		check.AddValuesStrings(col.Type.EnumType.Values)
 	case schema.DataTypeDomain:
 	case schema.DataTypeComposite,
 		schema.DataTypeRange,
 		schema.DataTypeMultiRange,
 		schema.DataTypePseudo:
 	default:
+	}
+}
+
+func (g *Generator) genColumnAttributeChecks(check *Check, col *schema.Column) {
+	if !col.Attributes.NotNullable {
+		check.AddValues("NULL")
 	}
 }
 
