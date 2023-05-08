@@ -1,44 +1,4 @@
 @startuml grapth
-
-{{- define "dump-column-uml"}}
-  {{- .Name}}:{{" "}}
-  {{- $column := .}}
-  {{- $type := $column.Type}}
-  {{- /* if array */}}
-  {{- if eq $type.Type.String "Array"}}
-      {{- with $type.ArrayType}}
-          {{- with .ElemType}}
-              {{- .TypeName.String}}
-              {{- if $column.Attributes.HasCharMaxLength -}}
-              ({{$column.Attributes.CharMaxLength}})
-              {{- end}}
-              {{- repeat $column.Attributes.ArrayDims "[]"}}
-          {{- else -}}
-              <ARRAY ELEMENT TYPE IS NOT SPECIFIED>
-          {{- end}}
-      {{- else -}}
-          <ARRAY TYPE IS NOT SPECIFIED>
-      {{- end}}
-  {{- else}}
-      {{- $type.TypeName.String}}
-      {{- if $column.Attributes.HasCharMaxLength -}}
-      ({{$column.Attributes.CharMaxLength}})
-      {{- end}}
-      {{- repeat $column.Attributes.ArrayDims "[]"}}
-  {{- /* if array */}}
-  {{- end}}
-  {{- with .Attributes}}
-    {{- if .NotNullable}} NOT NULL{{end}}
-    {{- if .HasDefault}}
-      {{- if .IsGenerated}} GENERATED ALWAYS
-      {{- else}} DEFAULT
-      {{- end}}
-      {{- " "}}{{.Default}}
-      {{- if .IsGenerated}} STORED{{end}}
-    {{- end}}
-  {{- end}}
-{{- end}}
-
 {{- /* range tables */}}
 {{- range .Schema.Tables}}
 {{- $table := .}}
@@ -47,13 +7,13 @@ class {{$table.Name}} {
   {{- with .PrimaryKey}}
     {{- if eq (len .Columns) 1}}
   *   {{- range .Columns}}
-        {{- template "dump-column-uml" .}}
+        {{- template "coltype" .}}
       {{- else -}}
         <PK COLUMN NOT FOUND>
       {{- end}}
     {{- else}}
       {{- range .Columns}}
-  *     {{- template "dump-column-uml" .}}
+  *     {{- template "coltype" .}}
       {{- end}}
     {{- end}}
   --
@@ -61,10 +21,9 @@ class {{$table.Name}} {
   {{- end}}
 
   {{- /* range fk */}}
-  {{- range .ForeignKeys}}
-    {{- $fk := .}}
-    {{- range .Foreign.Columns}}
-  *   {{- template "dump-column-uml" .}} REFERENCES {{$fk.Reference.Name}}({{$fk.ReferenceColumns | columnNames}})
+  {{- range $fk := $table.ForeignKeys}}
+    {{- range $fk.Foreign.Columns}}
+  *   {{- template "coltype" .}} REFERENCES {{$fk.Reference.Name}}({{$fk.ReferenceColumns | columnNames}})
     {{- end}}
   {{- /* range fk */}}
   {{- end}}
@@ -72,12 +31,13 @@ class {{$table.Name}} {
   {{- range .ColumnNames}}{{with index $table.Columns .}}
     {{- if or (isPK $table .) (isFK $table .)}}
     {{- else}}
-  {{template "dump-column-uml" .}}
+  {{template "coltype" .}}
     {{- end}}
   {{- /* range columns */}}
   {{- end}}{{end}}
-  --
 {{- /* range constraints */}}
+{{- with $table.Constraints}}
+  --
 {{- range $table.Constraints }}
   {{- $t := .Type.String}}
   {{- if eq $t "PK"}}
@@ -91,13 +51,14 @@ class {{$table.Name}} {
     {{- ""}} {{.Definition}}
   {{- end}}
 {{- /* range constraints */}}
-{{- end}}
-  --
+{{- end}}{{end}}
 {{- /* range indexes */}}
+{{- with $table.Indexes}}
+  --
 {{- range $table.Indexes }}
   **{{.Name}}**: {{.Definition}}
 {{- /* range indexes */}}
-{{- end}}
+{{- end}}{{end}}
 }
 {{/* range tables */}}
 {{- end}}

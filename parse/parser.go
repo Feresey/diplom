@@ -173,6 +173,9 @@ func (p *Parser) loadTablesColumns(ctx context.Context, s *schema.Schema) error 
 					HasCharMaxLength: dbcolumn.CharacterMaxLength.Valid,
 					CharMaxLength:    int(dbcolumn.CharacterMaxLength.Int32),
 					ArrayDims:        dbcolumn.ArrayDims,
+					IsNumeric:        dbcolumn.IsNumeric,
+					NumericPrecision: int(dbcolumn.NumericPriecision.Int32),
+					NumericScale:     int(dbcolumn.NumericScale.Int32),
 				},
 			},
 		}
@@ -552,6 +555,9 @@ func (p *Parser) makeDomainType(
 			HasCharMaxLength: dbtype.DomainCharacterMaxSize.Valid,
 			CharMaxLength:    int(dbtype.DomainCharacterMaxSize.Int32),
 			ArrayDims:        dbtype.DomainArrayDims,
+			IsNumeric:        dbtype.DomainIsNumeric,
+			NumericPrecision: int(dbtype.DomainNumericPrecision.Int32),
+			NumericScale:     int(dbtype.DomainNumericScale.Int32),
 		},
 		ElemType: elemType,
 	}

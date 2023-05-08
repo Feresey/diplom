@@ -100,6 +100,9 @@ type Column struct {
 	IsGenerated        bool
 	DefaultExpr        sql.NullString
 	CharacterMaxLength sql.NullInt32
+	IsNumeric          bool
+	NumericPriecision  sql.NullInt32
+	NumericScale       sql.NullInt32
 }
 
 func (Queries) Columns(ctx context.Context, exec Executor, tableNames []string) ([]Column, error) {
@@ -120,6 +123,9 @@ func (Queries) Columns(ctx context.Context, exec Executor, tableNames []string) 
 				&v.IsGenerated,
 				&v.DefaultExpr,
 				&v.CharacterMaxLength,
+				&v.IsNumeric,
+				&v.NumericPriecision,
+				&v.NumericScale,
 			)
 		},
 		queryColumnsSQL, tableNames)
@@ -193,6 +199,9 @@ type Type struct {
 	DomainSchema           sql.NullString
 	DomainType             sql.NullString
 	DomainCharacterMaxSize sql.NullInt32
+	DomainIsNumeric        bool
+	DomainNumericPrecision sql.NullInt32
+	DomainNumericScale     sql.NullInt32
 	DomainArrayDims        int
 	RangeElementTypeSchema sql.NullString
 	RangeElementTypeName   sql.NullString
@@ -218,6 +227,9 @@ func (Queries) Types(ctx context.Context, exec Executor, typeNames []string) ([]
 				&v.DomainSchema,
 				&v.DomainType,
 				&v.DomainCharacterMaxSize,
+				&v.DomainIsNumeric,
+				&v.DomainNumericPrecision,
+				&v.DomainNumericScale,
 				&v.DomainArrayDims,
 
 				&v.RangeElementTypeSchema,

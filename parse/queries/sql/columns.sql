@@ -21,7 +21,28 @@ SELECT
 			elem_t.oid,
 			a.atttypmod
 		)
-	)::INT AS character_max_length
+	)::INT AS character_max_length,
+	a.atttypmod = 1700 AS is_numeric,
+	COALESCE(
+		information_schema._pg_numeric_precision(
+			information_schema._pg_truetypid(a.*, t.*),
+			information_schema._pg_truetypmod(a.*, t.*)
+		),
+		information_schema._pg_numeric_precision(
+			elem_t.oid,
+			a.atttypmod
+		)
+	)::INT AS numeric_precision,
+	COALESCE(
+		information_schema._pg_numeric_scale(
+			information_schema._pg_truetypid(a.*, t.*),
+			information_schema._pg_truetypmod(a.*, t.*)
+		),
+		information_schema._pg_numeric_scale(
+			elem_t.oid,
+			a.atttypmod
+		)
+	)::INT AS numeric_scale
 FROM
 	pg_attribute a
 	JOIN pg_class pc_table ON a.attrelid = pc_table.oid

@@ -11,6 +11,9 @@ SELECT
 	nd.nspname   AS domain_schema,
 	dt.typname   AS domain_type,
 	information_schema._pg_char_max_length(dt.oid, t.typtypmod)::INT AS domain_character_max_length,
+	t.typtypmod = 1700 AS domain_is_numeric,
+	information_schema._pg_numeric_precision(dt.oid, t.typtypmod)::INT AS domain_precision,
+	information_schema._pg_numeric_scale(dt.oid, t.typtypmod)::INT AS domain_scale,
 	t.typndims   AS domain_array_dims,
 	-- range types
 	rst_ns.nspname AS range_element_type_schema,

@@ -5,43 +5,8 @@ CREATE TABLE {{$table.Name}} (
 {{- /* range columns */}}
 {{- $maxlen := 0}}{{range $table.ColumnNames}}{{if gt (len .) $maxlen}}{{$maxlen = len .}}{{end}}{{end}}
 {{- range $table.ColumnNames }}{{$column := index $table.Columns .}}
-    {{$column.Name}} {{space (len $column.Name) $maxlen}}
-    {{- $type := $column.Type}}
-    {{- /* if array */}}
-    {{- if eq $type.Type.String "Array"}}{{" "}}
-        {{- with $type.ArrayType}}
-            {{- with .ElemType}}
-                {{- .TypeName.String}}
-                {{- if $column.Attributes.HasCharMaxLength -}}
-                ({{$column.Attributes.CharMaxLength}})
-                {{- end}}
-                {{- repeat $column.Attributes.ArrayDims "[]"}}
-            {{- else -}}
-                <ARRAY ELEMENT TYPE IS NOT SPECIFIED>
-            {{- end}}
-        {{- else -}}
-            <ARRAY TYPE IS NOT SPECIFIED>
-        {{- end}}
-    {{- else}}
-        {{- $type.TypeName.String}}
-        {{- if $column.Attributes.HasCharMaxLength -}}
-        ({{$column.Attributes.CharMaxLength}})
-        {{- end}}
-        {{- repeat $column.Attributes.ArrayDims "[]"}}
-    {{- /* if array */}}
-    {{- end}}
-    {{- /* with attributes */}}
-    {{- with $column.Attributes}}
-        {{- if .NotNullable}} NOT NULL{{end}}
-        {{- if .HasDefault}}
-            {{- if .IsGenerated}} GENERATED ALWAYS
-            {{- else}} DEFAULT
-            {{- end}}
-            {{- " "}}{{.Default}}
-            {{- if .IsGenerated}} STORED{{end}}
-        {{- end}}
-    {{- /* with attributes */}}
-    {{- end}}
+    {{$column.Name}} {{space (len $column.Name) $maxlen}}{{" "}}
+    {{- template "coltype" $column}}
     {{- /* range foreign keys */}}
     {{- range $fk_id, $fk := $table.ForeignKeys}}
         {{- with index $fk.Foreign.Columns $column.Name}}

@@ -49,6 +49,9 @@ func (g Graph) MarshalJSON() ([]byte, error) {
 		HasDefault       bool   `json:"has_default,omitempty"`
 		IsGenerated      bool   `json:"is_generated,omitempty"`
 		Default          string `json:"default,omitempty"`
+		IsNumeric        bool   `json:"is_numeric,omitempty"`
+		NumericPrecision int    `json:"numeric_precision,omitempty"`
+		NumericScale     int    `json:"numeric_scale,omitempty"`
 	}
 	type column struct {
 		Type typ        `json:"type,omitempty"`
@@ -81,6 +84,9 @@ func (g Graph) MarshalJSON() ([]byte, error) {
 					HasDefault:       col.Attributes.HasDefault,
 					IsGenerated:      col.Attributes.IsGenerated,
 					Default:          col.Attributes.Default,
+					IsNumeric:        col.Attributes.IsNumeric,
+					NumericPrecision: col.Attributes.NumericPrecision,
+					NumericScale:     col.Attributes.NumericScale,
 				},
 			}
 		}

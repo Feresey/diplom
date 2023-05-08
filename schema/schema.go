@@ -148,7 +148,10 @@ type DomainAttributes struct {
 	HasCharMaxLength bool
 	CharMaxLength    int
 	// Уровень вложенности массива, например INTEGER[][]
-	ArrayDims int
+	ArrayDims        int
+	IsNumeric        bool
+	NumericPrecision int
+	NumericScale     int
 }
 
 // ColumnAttributes описывает аттрибуты колонки

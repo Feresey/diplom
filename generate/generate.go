@@ -62,12 +62,14 @@ func (g *Generator) Generate() error {
 func (g *Generator) genTableRules(table *schema.Table) []Check {
 	var checks []Check
 	for _, col := range table.Columns {
-		var c Check
-		c.AddColumn(col)
-		g.genColumnTypeChecks(&c, col)
-		g.genColumnAttributeChecks(&c, col)
+		var check Check
+		check.AddColumn(col)
+		g.genColumnTypeChecks(&check, col)
+		if !col.Attributes.NotNullable {
+			check.AddValues("NULL")
+		}
 
-		checks = append(checks, c)
+		checks = append(checks, check)
 	}
 
 	return checks
@@ -76,6 +78,7 @@ func (g *Generator) genTableRules(table *schema.Table) []Check {
 func (g *Generator) genColumnTypeChecks(check *Check, col *schema.Column) {
 	switch col.Type.Type {
 	case schema.DataTypeBase:
+	col.Type.TypeName
 	case schema.DataTypeArray:
 	case schema.DataTypeEnum:
 		check.AddValuesStrings(col.Type.EnumType.Values)
@@ -85,12 +88,6 @@ func (g *Generator) genColumnTypeChecks(check *Check, col *schema.Column) {
 		schema.DataTypeMultiRange,
 		schema.DataTypePseudo:
 	default:
-	}
-}
-
-func (g *Generator) genColumnAttributeChecks(check *Check, col *schema.Column) {
-	if !col.Attributes.NotNullable {
-		check.AddValues("NULL")
 	}
 }
 
