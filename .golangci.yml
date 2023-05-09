@@ -75,10 +75,15 @@ linters-settings:
         disabled: true
       - name: unused-parameter
 
+issues:
+  exclude-rules:
+    - linters: [lll]
+      source: "//.*$"
+
 linters:
   disable-all: true
   enable:
-    - bodyclose
+    - asciicheck
     - depguard
     - dogsled
     - errcheck
@@ -86,26 +91,33 @@ linters:
     - funlen
     - gochecknoinits
     - goconst
-    - gocritic
     - gocyclo
     - gofmt
     - goimports
     - gomnd
     - goprintffuncname
-    - gosec
-    - gosimple
-    - govet
     - ineffassign
     - lll
+    - makezero
     - misspell
     - nakedret
     - noctx
     - nolintlint
-    - revive
-    - staticcheck
-    - stylecheck
     - typecheck
     - unconvert
     - unparam
-    - unused
     - whitespace
+
+    - bodyclose # long
+    - dupl # long
+    - errorlint # long
+    # - goimports # long
+    - gosec # long
+    - govet # long
+    - unused # long
+
+    - gocritic # very long
+    - gosimple # very long
+    - staticcheck # very long
+    - stylecheck # very long
+    - revive

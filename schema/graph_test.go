@@ -1,9 +1,8 @@
-package generate
+package schema
 
 import (
 	"testing"
 
-	"github.com/Feresey/mtest/schema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -11,24 +10,24 @@ import (
 func TestTopologicalSort(t *testing.T) {
 	tables := []struct {
 		name     string
-		graph    map[string]map[string]*schema.Table
+		graph    map[string]map[string]*Table
 		expected []string
 	}{
 		{
 			"Single Table",
-			map[string]map[string]*schema.Table{
+			map[string]map[string]*Table{
 				"table1": {},
 			},
 			[]string{"table1"},
 		},
 		{
 			"No Tables",
-			map[string]map[string]*schema.Table{},
+			map[string]map[string]*Table{},
 			[]string{},
 		},
 		{
 			"No Relationships",
-			map[string]map[string]*schema.Table{
+			map[string]map[string]*Table{
 				"table1": {},
 				"table2": {},
 			},
@@ -36,7 +35,7 @@ func TestTopologicalSort(t *testing.T) {
 		},
 		{
 			"Simple Graph with One Cycle",
-			map[string]map[string]*schema.Table{
+			map[string]map[string]*Table{
 				"table1": {
 					"table2": nil,
 					"table3": nil,
@@ -54,7 +53,7 @@ func TestTopologicalSort(t *testing.T) {
 		},
 		{
 			"Simple Graph with Two Cycles",
-			map[string]map[string]*schema.Table{
+			map[string]map[string]*Table{
 				"table1": {
 					"table2": nil,
 					"table3": nil,
@@ -78,7 +77,7 @@ func TestTopologicalSort(t *testing.T) {
 		},
 		{
 			"Graph with All Tables Connected to One",
-			map[string]map[string]*schema.Table{
+			map[string]map[string]*Table{
 				"table1": {
 					"table2": nil,
 					"table3": nil,
@@ -97,7 +96,7 @@ func TestTopologicalSort(t *testing.T) {
 		},
 		{
 			"Graph with Tables Connected in a Chain",
-			map[string]map[string]*schema.Table{
+			map[string]map[string]*Table{
 				"table1": {
 					"table2": nil,
 				},
@@ -113,7 +112,7 @@ func TestTopologicalSort(t *testing.T) {
 		},
 		{
 			"Graph with Multiple Independent Cycles",
-			map[string]map[string]*schema.Table{
+			map[string]map[string]*Table{
 				"table1": {
 					"table2": nil,
 					"table3": nil,
@@ -135,7 +134,7 @@ func TestTopologicalSort(t *testing.T) {
 		},
 		{
 			"Graph with Self-Referencing Table",
-			map[string]map[string]*schema.Table{
+			map[string]map[string]*Table{
 				"table1": {
 					"table1": nil,
 				},
@@ -144,7 +143,7 @@ func TestTopologicalSort(t *testing.T) {
 		},
 		{
 			"Graph with Many Tables and Relationships",
-			map[string]map[string]*schema.Table{
+			map[string]map[string]*Table{
 				"table1": {
 					"table2": nil,
 					"table3": nil,
@@ -187,9 +186,9 @@ func TestTopologicalSort(t *testing.T) {
 
 	for _, tt := range tables {
 		t.Run(tt.name, func(t *testing.T) {
-			g := &Generator{g: &schema.Graph{
+			g := &Graph{
 				Graph: tt.graph,
-			}}
+			}
 
 			result, err := g.TopologicalSort()
 			if tt.expected == nil {
