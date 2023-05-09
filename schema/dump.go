@@ -167,6 +167,10 @@ func (g *Graph) Dump(w io.Writer, tplName TemplateName) error {
 		return fmt.Errorf("undefined template name: %s", tplName)
 	}
 
+	return g.dump(w, tplName, data)
+}
+
+func (g *Graph) dump(w io.Writer, tplName TemplateName, data any) error {
 	t := template.New("").
 		Funcs(sprig.TxtFuncMap()).
 		Funcs(template.FuncMap{

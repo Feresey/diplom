@@ -87,20 +87,26 @@ var Checks = map[string][]string{
 	},
 }
 
+type ChecksGenerator struct {
+	generatorBase
+}
+
 // GetDefaultChecks генерирует дефолтные проверки для всех таблиц
-func (g *Generator) GetDefaultChecks() map[string]PartialRecords {
+func (g *ChecksGenerator) GetDefaultChecks() map[string]PartialRecords {
 	res := make(map[string]PartialRecords, len(g.order))
 	for _, tableName := range g.order {
-		table := g.g.Schema.Tables[tableName]
+		table := g.tables[tableName]
 
-		// TODO configurate mergeChecks
-		res[tableName] = g.getDefaultTableChecks(table, true)
+		checks := g.getDefaultTableChecks(table)
+		// TODO configure mergeChecks
+		records := g.transformChecks(checks, true)
+		res[tableName] = records
 	}
 	return res
 }
 
 // getDefaultTableChecks генерирует дефолтные проверки для указанной таблицы
-func (g *Generator) getDefaultTableChecks(table *schema.Table, mergeChecks bool) PartialRecords {
+func (g *ChecksGenerator) getDefaultTableChecks(table *schema.Table) map[string]*ColumnChecks {
 	checks := make(map[string]*ColumnChecks, len(table.Columns))
 
 	foreignColumns := make(map[string]struct{}, len(table.Columns))
@@ -139,6 +145,13 @@ func (g *Generator) getDefaultTableChecks(table *schema.Table, mergeChecks bool)
 		}
 	}
 
+	return checks
+}
+
+func (g *ChecksGenerator) transformChecks(
+	checks map[string]*ColumnChecks,
+	mergeChecks bool,
+) PartialRecords {
 	var res PartialRecords
 
 	// объединение проверок отдельных колонок в частичные записи
@@ -159,7 +172,7 @@ func (g *Generator) getDefaultTableChecks(table *schema.Table, mergeChecks bool)
 	return res
 }
 
-func (g *Generator) getTypeChecks(check *ColumnChecks, typ *schema.DBType) {
+func (g *ChecksGenerator) getTypeChecks(check *ColumnChecks, typ *schema.DBType) {
 	switch typ.Type {
 	case schema.DataTypeBase:
 		g.baseTypesChecks(check, typ.TypeName.Name)
@@ -181,7 +194,7 @@ func (g *Generator) getTypeChecks(check *ColumnChecks, typ *schema.DBType) {
 	}
 }
 
-func (g *Generator) baseTypesChecks(check *ColumnChecks, typeName string) {
+func (g *ChecksGenerator) baseTypesChecks(check *ColumnChecks, typeName string) {
 	check.AddValuesQuote(Checks[Aliases[typeName]]...)
 	check.AddValuesQuote(Checks[typeName]...)
 }

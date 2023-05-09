@@ -37,7 +37,7 @@ linters-settings:
       - octalLiteral
       - whyNoLint
   gocyclo:
-    min-complexity: 15
+    min-complexity: 10
   gofmt:
     rewrite-rules:
       - pattern: 'interface{}'

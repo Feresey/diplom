@@ -266,11 +266,6 @@ func (p *Parser) makeConstraint(
 	s.Constraints[constraintName.String()] = c
 	table.Constraints[c.Name.String()] = c
 
-	// FIXME если тут что-то вышло значит запрос кривой
-	if c.Type != schema.ConstraintTypeFK && dbconstraint.ForeignTableOID.Valid {
-		p.log.Error("foreign columns in not foreign constraint", zap.Reflect("constraint", dbconstraint))
-	}
-
 	switch c.Type {
 	case schema.ConstraintTypePK:
 		// PRIMARY KEY либо один либо нет его
@@ -459,6 +454,20 @@ func (p *Parser) loadTypesByNames(
 			return nil, fmt.Errorf("internal error, type %q not found", typeName)
 		}
 
+		typType, ok := pgTypType[dbtype.TypeType]
+		if !ok {
+			return nil, fmt.Errorf("type value is undefined: %q", dbtype.TypeType)
+		}
+		if dbtype.IsArray {
+			typType = schema.DataTypeArray
+		}
+		typ.Type = typType
+
+		p.log.Debug("fill type",
+			zap.Stringer("type", typ.TypeName),
+			zap.Stringer("typ", typType),
+		)
+
 		more, err := p.fillType(s, typ, dbtype)
 		if err != nil {
 			return nil, fmt.Errorf("fill type %q: %w", typeName, err)
@@ -485,20 +494,6 @@ func (p *Parser) fillType(
 	typ *schema.DBType,
 	dbtype *queries.Type,
 ) (moreTypes []string, err error) {
-	typType, ok := pgTypType[dbtype.TypeType]
-	if !ok {
-		return nil, fmt.Errorf("type value is undefined: %q", dbtype.TypeType)
-	}
-	if dbtype.IsArray {
-		typType = schema.DataTypeArray
-	}
-	typ.Type = typType
-
-	p.log.Debug("fill type",
-		zap.Stringer("type", typ.TypeName),
-		zap.Stringer("typ", typType),
-	)
-
 	switch typ.Type {
 	default:
 		return nil, fmt.Errorf("data type is undefined: %s", typ.Type)

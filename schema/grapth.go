@@ -30,6 +30,7 @@ func (g *Graph) build() {
 	}
 }
 
+//nolint:gocyclo // algo
 func (g *Graph) TopologicalSort() ([]string, error) {
 	// Create a slice to store the result
 	result := make([]string, 0, len(g.Graph))
