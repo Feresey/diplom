@@ -3,3 +3,6 @@ parser:
   # - pg_catalog
   - test
   # - public
+generator:
+  # checks: merge
+  checks: spare

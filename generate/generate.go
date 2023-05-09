@@ -14,16 +14,11 @@ import (
 	"github.com/Feresey/mtest/schema"
 )
 
-type generatorBase struct {
+type Generator struct {
 	tables map[string]*schema.Table
 	order  []string
-}
 
-type Generator struct {
-	generatorBase
-
-	log  *zap.Logger
-	cgen *ChecksGenerator
+	log *zap.Logger
 }
 
 func New(
@@ -36,17 +31,10 @@ func New(
 	}
 	log.Info("tables insert order", zap.Strings("order", order))
 
-	base := generatorBase{
+	g := &Generator{
+		log:    log,
 		tables: graph.Schema.Tables,
 		order:  order,
-	}
-
-	g := &Generator{
-		log:           log,
-		generatorBase: base,
-		cgen: &ChecksGenerator{
-			base,
-		},
 	}
 	return g, nil
 }
@@ -80,9 +68,9 @@ func (g *Generator) GenerateRecords(
 		tablePartialRecords, ok := partialRecords[tableName]
 		if !ok {
 			g.log.Info("generate default checks for table", zap.String("table", tableName))
-			checks := g.cgen.getDefaultTableChecks(table)
+			checks := g.getDefaultTableChecks(table)
 			// TODO configure mergeChecks
-			tablePartialRecords = g.cgen.transformChecks(checks, true)
+			tablePartialRecords = g.transformChecks(checks, true)
 		}
 
 		domain, ok := domains[tableName]

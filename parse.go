@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func DumpCommand(f flags) *cli.Command {
+func ParseCommand(f flags) *cli.Command {
 	outputPath := &cli.StringFlag{
 		Name:    "output",
 		Aliases: []string{"o"},
@@ -59,7 +59,7 @@ func DumpCommand(f flags) *cli.Command {
 			)
 
 			app := NewApp(ctx, log, conf, f, fx.Populate(&log, &parser, &parserConfig))
-			return RunApp(app, log, func(runCtx context.Context) error {
+			return RunApp(ctx.Context, app, log, func(runCtx context.Context) error {
 				g, err := parseSchema(runCtx, log, parser, conf.Parser)
 				if err != nil {
 					return err

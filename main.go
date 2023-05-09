@@ -90,7 +90,8 @@ func main() {
 		Description: "migration test tool",
 		Flags:       f.Set(),
 		Commands: []*cli.Command{
-			DumpCommand(f),
+			ParseCommand(f),
+			GenerateCommand(f),
 		},
 	}
 	err := app.Run(os.Args)
@@ -133,8 +134,13 @@ func NewApp(
 	)
 }
 
-func RunApp(app *fx.App, log *zap.Logger, run func(ctx context.Context) error) (runErr error) {
-	runCtx, cancel := context.WithCancel(context.Background())
+func RunApp(
+	ctx context.Context,
+	app *fx.App,
+	log *zap.Logger,
+	run func(ctx context.Context) error,
+) (runErr error) {
+	runCtx, cancel := context.WithCancel(ctx)
 	go func() {
 		<-app.Done()
 		cancel()

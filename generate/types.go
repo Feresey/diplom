@@ -2,7 +2,6 @@ package generate
 
 import (
 	"sort"
-	"strconv"
 )
 
 type ColumnChecks struct {
@@ -10,7 +9,7 @@ type ColumnChecks struct {
 }
 
 func (c *ColumnChecks) AddValues(vals ...string) {
-	c.AddValuesProcess(strconv.Quote, vals...)
+	c.Values = append(c.Values, vals...)
 }
 
 func (c *ColumnChecks) AddValuesProcess(f func(string) string, vals ...string) {
@@ -48,6 +47,7 @@ func (p *PartialRecords) MergeAdd(r PartialRecord) {
 	record := p.searchNoOverlapRecord(r.Columns)
 	if record == nil {
 		*p = append(*p, r)
+		return
 	}
 
 	p.merge(record, r)

@@ -64,11 +64,11 @@ var Checks = map[string][]string{
 	"int4": {strconv.Itoa(math.MaxInt32), strconv.Itoa(math.MinInt32)},
 	"int8": {strconv.Itoa(math.MaxInt64), strconv.Itoa(math.MinInt64)},
 	// numeric типы с явно указанными precision и scale не могут хранить +-Inf
-	"numeric": {"0", "'NaN'::NUMERIC"},
+	"numeric": {"'NaN'::NUMERIC"},
 	"float":   {"0", "'NaN'::REAL", "'infinity'::REAL", "'-infinity'::REAL"},
 
 	// нет текстовых типов с длиной меньше 1, а нолик для любого текстового типа валидный (вроде)
-	"text": {"", " ", "0"},
+	"text": {"''", "' '", "'0'"},
 
 	"datetime": {
 		"'epoch'::TIMESTAMP",
@@ -80,12 +80,8 @@ var Checks = map[string][]string{
 	},
 }
 
-type ChecksGenerator struct {
-	generatorBase
-}
-
 // GetDefaultChecks генерирует дефолтные проверки для всех таблиц
-func (g *ChecksGenerator) GetDefaultChecks() map[string]PartialRecords {
+func (g *Generator) GetDefaultChecks() map[string]PartialRecords {
 	res := make(map[string]PartialRecords, len(g.order))
 	for _, tableName := range g.order {
 		table := g.tables[tableName]
@@ -99,7 +95,7 @@ func (g *ChecksGenerator) GetDefaultChecks() map[string]PartialRecords {
 }
 
 // getDefaultTableChecks генерирует дефолтные проверки для указанной таблицы
-func (g *ChecksGenerator) getDefaultTableChecks(table *schema.Table) map[string]*ColumnChecks {
+func (g *Generator) getDefaultTableChecks(table *schema.Table) map[string]*ColumnChecks {
 	checks := make(map[string]*ColumnChecks, len(table.Columns))
 
 	foreignColumns := make(map[string]struct{}, len(table.Columns))
@@ -129,6 +125,7 @@ func (g *ChecksGenerator) getDefaultTableChecks(table *schema.Table) map[string]
 		}
 		g.getTypeChecks(check, col.Type)
 
+		// TODO numeric min max
 		if col.Attributes.IsNumeric && col.Attributes.NumericPrecision == 0 {
 			check.AddValues("'infinity'::NUMERIC", "'-infinity'::NUMERIC")
 		}
@@ -136,7 +133,8 @@ func (g *ChecksGenerator) getDefaultTableChecks(table *schema.Table) map[string]
 		// Только если это текстовый тип и он имеет аттрибут CharMaxLength, то надо сгенерить строчку максимальной длины
 		// TODO нужно ли проверять на текстовость?
 		if attr.HasCharMaxLength {
-			check.AddValues(
+			check.AddValuesProcess(
+				func(s string) string { return fmt.Sprintf("'%s'", s) },
 				strings.Repeat(" ", attr.CharMaxLength),
 				strings.Repeat("0", attr.CharMaxLength),
 			)
@@ -146,7 +144,7 @@ func (g *ChecksGenerator) getDefaultTableChecks(table *schema.Table) map[string]
 	return checks
 }
 
-func (g *ChecksGenerator) transformChecks(
+func (g *Generator) transformChecks(
 	checks map[string]*ColumnChecks,
 	mergeChecks bool,
 ) PartialRecords {
@@ -170,7 +168,7 @@ func (g *ChecksGenerator) transformChecks(
 	return res
 }
 
-func (g *ChecksGenerator) getTypeChecks(check *ColumnChecks, typ *schema.DBType) {
+func (g *Generator) getTypeChecks(check *ColumnChecks, typ *schema.DBType) {
 	switch typ.Type {
 	case schema.DataTypeBase:
 		g.baseTypesChecks(check, typ.TypeName.Name)
@@ -192,7 +190,7 @@ func (g *ChecksGenerator) getTypeChecks(check *ColumnChecks, typ *schema.DBType)
 	}
 }
 
-func (g *ChecksGenerator) baseTypesChecks(check *ColumnChecks, typeName string) {
+func (g *Generator) baseTypesChecks(check *ColumnChecks, typeName string) {
 	check.AddValues(Checks[Aliases[typeName]]...)
 	check.AddValues(Checks[typeName]...)
 }
