@@ -4,36 +4,37 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 
 	"github.com/Feresey/mtest/schema"
 )
 
+// var BaseTypes = map[string]struct{}{
+// 	"bool": {},
+
+// 	"int2":    {},
+// 	"int4":    {},
+// 	"int8":    {},
+// 	"float4":  {},
+// 	"float8":  {},
+// 	"numeric": {},
+
+// 	"uuid":    {},
+// 	"bytea":   {},
+// 	"bit":     {},
+// 	"varbit":  {},
+// 	"char":    {},
+// 	"varchar": {},
+// 	"text":    {},
+
+// 	"date":        {},
+// 	"time":        {},
+// 	"timetz":      {},
+// 	"timestamp":   {},
+// 	"timestamptz": {},
+// }
+
 // TODO это можно вынести как конфиг или типа луа код
-
-var BaseTypes = map[string]struct{}{
-	"bool": {},
-
-	"int2":    {},
-	"int4":    {},
-	"int8":    {},
-	"float4":  {},
-	"float8":  {},
-	"numeric": {},
-
-	"uuid":    {},
-	"bytea":   {},
-	"bit":     {},
-	"varbit":  {},
-	"char":    {},
-	"varchar": {},
-	"text":    {},
-
-	"date":        {},
-	"time":        {},
-	"timetz":      {},
-	"timestamp":   {},
-	"timestamptz": {},
-}
 
 var Aliases = map[string]string{
 	"int2":   "int",
@@ -50,11 +51,10 @@ var Aliases = map[string]string{
 	"varchar": "text",
 
 	"timetz":      "time",
-	"timestamp":   "date",
-	"timestamptz": "date",
+	"date":        "datetime",
+	"timestamp":   "datetime",
+	"timestamptz": "datetime",
 }
-
-// TODO add explicit type cast to result only if needed
 
 var Checks = map[string][]string{
 	"bool": {"True", "False"},
@@ -64,25 +64,18 @@ var Checks = map[string][]string{
 	"int4": {strconv.Itoa(math.MaxInt32), strconv.Itoa(math.MinInt32)},
 	"int8": {strconv.Itoa(math.MaxInt64), strconv.Itoa(math.MinInt64)},
 	// numeric типы с явно указанными precision и scale не могут хранить +-Inf
-	"numeric": {"0", "-1", "1", "'NaN'::NUMERIC"},
-	"float":   {"0", "-1", "1", "'NaN'::REAL", "'infinity'::REAL", "'-infinity'::REAL"},
+	"numeric": {"0", "'NaN'::NUMERIC"},
+	"float":   {"0", "'NaN'::REAL", "'infinity'::REAL", "'-infinity'::REAL"},
 
 	// нет текстовых типов с длиной меньше 1, а нолик для любого текстового типа валидный (вроде)
 	"text": {"", " ", "0"},
 
-	"date": {
+	"datetime": {
 		"'epoch'::TIMESTAMP",
 		"'infinity'::TIMESTAMP",
 		"'-infinity'::TIMESTAMP",
-		// TODO это разве ок?
-		"'now'::TIMESTAMP",
-		"'today'::TIMESTAMP",
-		"'tomorrow'::TIMESTAMP",
-		"'yesterday'::TIMESTAMP",
 	},
 	"time": {
-		// TODO это разве ок?
-		"'now'::TIME",
 		"'allballs'::TIME",
 	},
 }
@@ -119,10 +112,9 @@ func (g *ChecksGenerator) getDefaultTableChecks(table *schema.Table) map[string]
 	for colName, col := range table.Columns {
 		check := &ColumnChecks{}
 		attr := col.Attributes
-		typ := col.Type.TypeName.Name
 
 		if !attr.NotNullable {
-			check.AddValuesQuote("NULL")
+			check.AddValues("NULL")
 		}
 
 		// если тип не является встроенным в postgresql, то я его не обрабатываю
@@ -137,11 +129,17 @@ func (g *ChecksGenerator) getDefaultTableChecks(table *schema.Table) map[string]
 		}
 		g.getTypeChecks(check, col.Type)
 
+		if col.Attributes.IsNumeric && col.Attributes.NumericPrecision == 0 {
+			check.AddValues("'infinity'::NUMERIC", "'-infinity'::NUMERIC")
+		}
+
 		// Только если это текстовый тип и он имеет аттрибут CharMaxLength, то надо сгенерить строчку максимальной длины
-		if typ == "text" || Aliases[typ] == "text" {
-			if attr.HasCharMaxLength {
-				check.AddValues(fmt.Sprintf("makestrlen(%d)::%s", attr.CharMaxLength, typ))
-			}
+		// TODO нужно ли проверять на текстовость?
+		if attr.HasCharMaxLength {
+			check.AddValues(
+				strings.Repeat(" ", attr.CharMaxLength),
+				strings.Repeat("0", attr.CharMaxLength),
+			)
 		}
 	}
 
@@ -182,10 +180,10 @@ func (g *ChecksGenerator) getTypeChecks(check *ColumnChecks, typ *schema.DBType)
 		// dims := col.Attributes.ArrayDims
 	case schema.DataTypeEnum:
 		check.AddValuesProcess(func(s string) string {
-			return fmt.Sprintf("'%s'::%s", s, typ.EnumType.TypeName)
+			return fmt.Sprintf("'%s'::%s", s, typ.EnumType.TypeName.String())
 		}, typ.EnumType.Values...)
 	case schema.DataTypeDomain:
-		g.baseTypesChecks(check, typ.DomainType.ElemType.TypeName.Name)
+		g.getTypeChecks(check, typ.DomainType.ElemType)
 	case schema.DataTypeComposite,
 		schema.DataTypeRange,
 		schema.DataTypeMultiRange,
@@ -195,6 +193,6 @@ func (g *ChecksGenerator) getTypeChecks(check *ColumnChecks, typ *schema.DBType)
 }
 
 func (g *ChecksGenerator) baseTypesChecks(check *ColumnChecks, typeName string) {
-	check.AddValuesQuote(Checks[Aliases[typeName]]...)
-	check.AddValuesQuote(Checks[typeName]...)
+	check.AddValues(Checks[Aliases[typeName]]...)
+	check.AddValues(Checks[typeName]...)
 }

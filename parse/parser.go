@@ -48,8 +48,6 @@ func NewParser(
 }
 
 // TODO вернуть ошибку если данные ссылаются на не указанную схему
-// TODO как ограничивать внутри схемы таблицы, которые будут обрабатываться?
-// TODO Или на этом этапе это неважно?
 func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, error) {
 	s := &schema.Schema{
 		Types:          make(map[string]*schema.DBType),
@@ -499,9 +497,7 @@ func (p *Parser) fillType(
 		return nil, fmt.Errorf("data type is undefined: %s", typ.Type)
 	case schema.DataTypeBase:
 	case schema.DataTypeMultiRange:
-	// TODO что мне делать с multirange типом? где он вообще может использоваться?
 	case schema.DataTypePseudo:
-	// TODO что мне делать с pseudo типом? где он вообще может использоваться?
 	case schema.DataTypeDomain:
 		moreTypes, typ.DomainType, err = p.makeDomainType(s, typ.TypeName, dbtype)
 	case schema.DataTypeArray:
@@ -663,8 +659,7 @@ func (p *Parser) makeCompositeType(
 	}()
 
 	return &schema.CompositeType{
-		TypeName: compositeTypeName,
-		// TODO а что мне делать с композитами?
+		TypeName:   compositeTypeName,
 		Attributes: make(map[string]*schema.CompositeAttribute),
 	}, nil
 }

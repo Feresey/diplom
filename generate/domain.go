@@ -27,7 +27,7 @@ func (id *IntDomain) Next() bool {
 	} else {
 		id.value = -1 * (id.counter / 2)
 	}
-	return id.value < id.top
+	return id.value <= id.top
 }
 
 func (id *IntDomain) Value() string { return strconv.Itoa(id.value) }
@@ -35,7 +35,6 @@ func (id *IntDomain) Value() string { return strconv.Itoa(id.value) }
 func (id *IntDomain) Reset() {
 	id.counter = 0
 	id.value = 0
-	id.top = 1000
 }
 
 func (id *IntDomain) ResetWith(top int) {
@@ -69,18 +68,19 @@ func (fd *FloatDomain) Next() bool {
 func (fd *FloatDomain) Value() string { return strconv.FormatFloat(fd.value, 'f', -1, 64) }
 
 func (fd *FloatDomain) Reset() {
-	fd.ResetWith(0.1, 10) //nolint:gomnd // default value
+	fd.index = -1
+	fd.value = 0
 }
 
 func (fd *FloatDomain) ResetWith(step, top float64) {
-	fd.index = -1
-	fd.value = 0
+	fd.Reset()
 	fd.step = step
 	fd.top = top
 }
 
 type TimeDomain struct {
 	index int
+	now   time.Time
 	value time.Time
 	top   int
 }
@@ -101,14 +101,13 @@ func (td *TimeDomain) Next() bool {
 }
 
 func (td *TimeDomain) Value() string { return td.value.Format(time.RFC3339) }
-func (td *TimeDomain) Reset() {
-	td.ResetWith(time.Now(), 1000) //nolint:gomnd // default
-}
+func (td *TimeDomain) Reset()        { td.index = -1 }
 
 func (td *TimeDomain) ResetWith(now time.Time, top int) {
-	td.index = -1
+	td.Reset()
 	td.top = top
 	td.value = now
+	td.now = now
 }
 
 type UUIDDomain struct{}
@@ -129,3 +128,10 @@ func (ed *EnumDomain) Next() bool {
 
 func (ed *EnumDomain) Value() string { return ed.values[ed.index] }
 func (ed *EnumDomain) Reset()        { ed.index = -1 }
+
+func BoolDomain() *EnumDomain {
+	return &EnumDomain{
+		values: []string{"True", "False"},
+		index:  -1,
+	}
+}

@@ -8,6 +8,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestIntDomain(t *testing.T) {
+	id := &IntDomain{}
+	id.ResetWith(2)
+
+	// Test Next and Value methods for the first few values
+	expectedValues := []string{"0", "1", "-1", "2", "-2"}
+	for i, expected := range expectedValues {
+		require.True(t, id.Next(), "Expected Next to return true for value %d", i)
+		actual := id.Value()
+		assert.Equal(t, expected, actual,
+			"Expected Value to return %q for value %d, but got %q", expected, i, actual)
+	}
+
+	// Test that Next returns false after reaching the top of the domain
+	require.False(t, id.Next(), "Expected Next to return false after reaching the top of the domain")
+
+	// Test Reset method
+	id.Reset()
+	assert.Equal(t, 0, id.counter, "Expected Reset to reset the IntDomain struct")
+	assert.Equal(t, 1000, id.top, "Expected Reset to reset the IntDomain struct")
+	assert.Equal(t, 0, id.value, "Expected Reset to reset the IntDomain struct")
+
+	// Test ResetWith method
+	id.ResetWith(10)
+	assert.Equal(t, 0, id.counter, "Expected ResetWith to reset the IntDomain struct")
+	assert.Equal(t, 10, id.top, "Expected ResetWith to set the top value correctly")
+	assert.Equal(t, 0, id.value, "Expected ResetWith to reset the IntDomain struct")
+}
+
 func TestTimeDomain(t *testing.T) {
 	td := &TimeDomain{}
 	td.ResetWith(time.Date(2023, 1, 3, 0, 0, 0, 0, time.UTC), 5)

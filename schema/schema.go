@@ -10,7 +10,6 @@ type Identifier struct {
 	Name string
 }
 
-// TODO нужно ли добавлять "%s"."%s"?
 func (i Identifier) String() string { return i.Schema + "." + i.Name }
 
 // Schema отражает схему, расположенную в базе данных
@@ -114,7 +113,6 @@ type EnumType struct {
 	Values   []string
 }
 
-// TODO а что я вообще могу сделать с composite типом?
 type CompositeType struct {
 	TypeName   Identifier
 	Attributes map[string]*CompositeAttribute

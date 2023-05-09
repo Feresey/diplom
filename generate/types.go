@@ -10,10 +10,6 @@ type ColumnChecks struct {
 }
 
 func (c *ColumnChecks) AddValues(vals ...string) {
-	c.Values = append(c.Values, vals...)
-}
-
-func (c *ColumnChecks) AddValuesQuote(vals ...string) {
 	c.AddValuesProcess(strconv.Quote, vals...)
 }
 
