@@ -136,10 +136,12 @@ func (g *tableGenerator) processRecord(precord PartialRecord) (map[string]string
 		if _, ok := record[colName]; ok {
 			continue
 		}
-		// col, ok := table.Columns[colName]
-		// if !ok {
-		// 	return nil, fmt.Errorf("internal error: column %q not found for table %q", colName, table.Name)
-		// }
+		col, ok := g.table.Columns[colName]
+		if !ok {
+			return nil, fmt.Errorf(
+				"internal error: column %q not found for table %q",
+				colName, g.table.Name)
+		}
 
 		domain, ok := g.columnsDomain[colName]
 		if !ok {
@@ -152,8 +154,12 @@ func (g *tableGenerator) processRecord(precord PartialRecord) (map[string]string
 		var isValid bool
 	domainLoop:
 		for domain.Next() {
-			// TODO сделать максимальное ограничение на количество итераций. Возможно через конфиг
-			record[colName] = domain.Value()
+			value := domain.Value()
+			// FIXME +1 ?
+			if col.Attributes.HasCharMaxLength && len(value) > col.Attributes.CharMaxLength {
+				value = value[:col.Attributes.CharMaxLength]
+			}
+			record[colName] = value
 
 			for indexName, index := range g.uniqueIndexes {
 				key := g.concatIndexColumnsFromRecord(record, index)

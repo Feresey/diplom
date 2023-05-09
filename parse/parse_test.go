@@ -11,13 +11,14 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func TestTypes(t *testing.T) {
+func TestParse(t *testing.T) {
 	tests := []*struct {
 		name    string
 		tables  []queries.Tables
 		columns []queries.Column
 		tc      []queries.Constraint
 		types   []queries.Type
+		indexes []queries.Index
 	}{
 		{
 			name:    "simple",
@@ -40,6 +41,8 @@ func TestTypes(t *testing.T) {
 			q.EXPECT().Columns(mock.Anything, mock.Anything, mock.Anything).Return(tt.columns, nil)
 			q.EXPECT().Constraints(mock.Anything, mock.Anything, mock.Anything).Return(tt.tc, nil)
 			q.EXPECT().Types(mock.Anything, mock.Anything, mock.Anything).Return(tt.types, nil)
+			q.EXPECT().Indexes(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				Return(tt.indexes, nil)
 
 			p := Parser{
 				conn: nil,
