@@ -33,9 +33,28 @@ type PartialRecord struct {
 
 func (p PartialRecord) Len() int           { return len(p.Columns) }
 func (p PartialRecord) Less(i, j int) bool { return p.Columns[i] < p.Columns[j] }
-func (p *PartialRecord) Swap(i, j int) {
+func (p PartialRecord) Swap(i, j int) {
 	p.Columns[i], p.Columns[j] = p.Columns[j], p.Columns[i]
 	p.Values[i], p.Values[j] = p.Values[j], p.Values[i]
+}
+
+func sortPartialByNames(pr PartialRecord, columns []string) {
+	sorted := make(map[string]int, len(pr.Columns))
+	target := make(map[string]int, len(columns))
+	for idx, value := range pr.Columns {
+		sorted[value] = idx
+	}
+	idx := 0
+	for _, value := range columns {
+		if _, ok := sorted[value]; ok {
+			target[value] = idx
+			idx++
+		}
+	}
+
+	for col, idx := range sorted {
+		pr.Swap(idx, target[col])
+	}
 }
 
 type PartialRecords []PartialRecord

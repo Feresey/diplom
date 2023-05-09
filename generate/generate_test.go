@@ -49,7 +49,7 @@ func TestNumericToFloatDomainParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("precision:%d,scale:%d", tt.precision, tt.scale),
 			func(t *testing.T) {
-				top, step := NumericToFloatDomainParams(tt.precision, tt.scale)
+				top, step := numericToFloatDomainParams(tt.precision, tt.scale)
 				assert.InDelta(t, tt.wantTop, top, eps)
 				assert.InDelta(t, tt.wantStep, step, eps)
 			})

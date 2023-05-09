@@ -70,7 +70,7 @@ func (g *Generator) GenerateRecords(
 			g.log.Info("generate default checks for table", zap.String("table", tableName))
 			checks := g.getDefaultTableChecks(table)
 			// TODO configure mergeChecks
-			tablePartialRecords = g.transformChecks(checks, true)
+			tablePartialRecords = g.transformChecks(table, checks, true)
 		}
 
 		domain, ok := domains[tableName]
@@ -138,7 +138,7 @@ func (g *Generator) DefaultDomain(col *schema.Column) (Domain, error) {
 		return &i, nil
 	case "float4", "float8", "numeric":
 		var f FloatDomain
-		f.ResetWith(NumericToFloatDomainParams(
+		f.ResetWith(numericToFloatDomainParams(
 			col.Attributes.NumericPrecision,
 			col.Attributes.NumericScale,
 		))
@@ -171,7 +171,7 @@ func (g *Generator) DefaultDomain(col *schema.Column) (Domain, error) {
 	}
 }
 
-func NumericToFloatDomainParams(precision, scale int) (top, step float64) {
+func numericToFloatDomainParams(precision, scale int) (top, step float64) {
 	if precision == 0 {
 		return defaultTopFloatDomain, defaultStepFloatDomain
 	}

@@ -88,7 +88,7 @@ func (g *Generator) GetDefaultChecks() map[string]PartialRecords {
 
 		checks := g.getDefaultTableChecks(table)
 		// TODO configure mergeChecks
-		records := g.transformChecks(checks, true)
+		records := g.transformChecks(table, checks, true)
 		res[tableName] = records
 	}
 	return res
@@ -145,6 +145,7 @@ func (g *Generator) getDefaultTableChecks(table *schema.Table) map[string]*Colum
 }
 
 func (g *Generator) transformChecks(
+	table *schema.Table,
 	checks map[string]*ColumnChecks,
 	mergeChecks bool,
 ) PartialRecords {
@@ -163,6 +164,10 @@ func (g *Generator) transformChecks(
 				res = append(res, pr)
 			}
 		}
+	}
+
+	for idx := range res {
+		sortPartialByNames(res[idx], table.ColumnNames)
 	}
 
 	return res
