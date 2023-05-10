@@ -1,7 +1,7 @@
 dbconn: "postgresql://postgres:postgres@localhost:5432"
 parser:
   # - pg_catalog
-  # - test
+  - test
   - public
 generator:
   # checks: merge

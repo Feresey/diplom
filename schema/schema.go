@@ -76,7 +76,7 @@ type Column struct {
 	// Имя колонки
 	Name string `json:"name,omitempty"`
 	// Таблица, которой принадлежит колонка
-	Table *Table `json:"-,omitempty"`
+	Table *Table `json:"-"`
 	// Тип колонки
 	Type *DBType `json:"type,omitempty"`
 	// Аттрибуты колонки
@@ -211,7 +211,7 @@ type Constraint struct {
 	// Тип ограничения
 	Type ConstraintType `json:"type,omitempty"`
 	// Таблица, которой принадлежит ограничение
-	Table *Table `-:"table,omitempty"`
+	Table *Table `json:"-"`
 	// Индекс, на котором основано органичение (может быть пустым)
 	Index *Index `json:"index,omitempty"`
 
@@ -231,7 +231,7 @@ type Index struct {
 	// Имя индекса
 	Name Identifier `json:"name,omitempty"`
 	// Таблица, для которой создан индекс
-	Table *Table `json:"-,omitempty"`
+	Table *Table `json:"-"`
 	// Колонки, которые затрагивает индекс
 	Columns map[string]*Column `json:"columns,omitempty"`
 	// Определение индекса
@@ -419,6 +419,7 @@ func (s *Schema) fillTableConstraints(table *Table) error {
 		if err != nil {
 			return err
 		}
+		constraint.Table = table
 		table.Constraints[conname] = constraint
 	}
 	return nil
@@ -431,6 +432,7 @@ func (s *Schema) fillTableIndexes(table *Table) error {
 		if err != nil {
 			return err
 		}
+		index.Table = table
 		table.Indexes[indname] = index
 	}
 	return nil
@@ -491,6 +493,9 @@ func (s *Schema) fillTable(table *Table) error {
 		return err
 	}
 
+	if table.PrimaryKey == nil {
+		return nil
+	}
 	pk, err := getValueFormat(s.Constraints, table.PrimaryKey.String(),
 		"primary key %q not found for table %q",
 		table.PrimaryKey, table)
@@ -512,9 +517,9 @@ func (s *Schema) fillTables() error {
 }
 
 func (s *Schema) UnmarshalJSON(data []byte) error {
-	type ss Schema
-	var temp ss
-	if err := json.Unmarshal(data, &s); err != nil {
+	type schema Schema
+	var temp schema
+	if err := json.Unmarshal(data, &temp); err != nil {
 		return err
 	}
 	*s = Schema(temp)
@@ -525,14 +530,15 @@ func (s *Schema) UnmarshalJSON(data []byte) error {
 	if err := s.fillTypes(); err != nil {
 		return err
 	}
+	if err := s.fillTables(); err != nil {
+		return err
+	}
 	if err := s.fillIndexes(); err != nil {
 		return err
 	}
 	if err := s.fillConstraints(); err != nil {
 		return err
 	}
-	if err := s.fillTables(); err != nil {
-		return err
-	}
+
 	return nil
 }

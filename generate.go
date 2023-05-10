@@ -49,7 +49,7 @@ func (p *generateCommand) Command() *cli.Command {
 			p.flags.outputPath,
 			p.flags.schema.dumpPath,
 		),
-		Before: p.init,
+		Before: p.Init,
 		Action: p.GenerateRecords,
 		Subcommands: []*cli.Command{
 			p.DefaultsCommand(),
@@ -57,19 +57,23 @@ func (p *generateCommand) Command() *cli.Command {
 	}
 }
 
-func (p *generateCommand) init(ctx *cli.Context) error {
+func (p *generateCommand) Init(ctx *cli.Context) error {
 	base, err := NewBase(ctx, p.flags.flags)
 	if err != nil {
 		return cli.Exit(err, 2)
 	}
 	p.baseCommand = base
-	p.schemaLoader = NewSchemaLoader(base)
+	loader, err := NewSchemaLoader(ctx, base, p.flags.flags, p.flags.schema)
+	if err != nil {
+		return err
+	}
+	p.schemaLoader = loader
 
 	return nil
 }
 
 func (p *generateCommand) GenerateRecords(ctx *cli.Context) error {
-	s, err := p.schemaLoader.GetSchema(ctx, p.flags.schema.dumpPath.Get(ctx))
+	s, err := p.schemaLoader.GetSchema(ctx, p.flags.schema)
 	if err != nil {
 		return err
 	}
@@ -83,7 +87,7 @@ func (p *generateCommand) GenerateRecords(ctx *cli.Context) error {
 
 	records, err := gen.GenerateRecords(nil, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("generate records: %w", err)
 	}
 	return dumpRecordsCSV(records)
 }
@@ -102,7 +106,7 @@ func (p *generateCommand) DefaultsCommand() *cli.Command {
 			defaultChecks,
 		},
 		Action: func(ctx *cli.Context) error {
-			s, err := p.schemaLoader.GetSchema(ctx, p.flags.schema.dumpPath.Get(ctx))
+			s, err := p.schemaLoader.GetSchema(ctx, p.flags.schema)
 			if err != nil {
 				return err
 			}

@@ -53,13 +53,13 @@ func (p *parseCommand) Command() *cli.Command {
 		Name:        "parse",
 		Description: "parse schema",
 		Flags:       p.pf.Set(),
-		Before:      p.init,
-		Action:      p.run,
-		After:       p.cleanup,
+		Before:      p.Init,
+		Action:      p.Run,
+		After:       p.Cleanup,
 	}
 }
 
-func (p *parseCommand) init(ctx *cli.Context) error {
+func (p *parseCommand) Init(ctx *cli.Context) error {
 	base, err := NewBase(ctx, p.pf.flags)
 	if err != nil {
 		return cli.Exit(err, 2)
@@ -73,7 +73,7 @@ func (p *parseCommand) init(ctx *cli.Context) error {
 	return nil
 }
 
-func (p *parseCommand) cleanup(ctx *cli.Context) error {
+func (p *parseCommand) Cleanup(ctx *cli.Context) error {
 	if p.conn == nil {
 		return nil
 	}
@@ -83,7 +83,7 @@ func (p *parseCommand) cleanup(ctx *cli.Context) error {
 	return nil
 }
 
-func (p *parseCommand) run(ctx *cli.Context) error {
+func (p *parseCommand) Run(ctx *cli.Context) error {
 	parser := parse.NewParser(p.conn, p.log)
 	s, err := parser.LoadSchema(ctx.Context, p.cnf.Parser)
 	if err != nil {
@@ -127,8 +127,10 @@ func (p *parseCommand) dump(graph *schema.Graph, dumpPath string) error {
 
 	jsonDumpPath := filepath.Join(dumpPath, "dump.json")
 	slog.Infof("dump schema to %q", jsonDumpPath)
-	if err := p.dumpToFile(graphDumpPath, func(w io.Writer) error {
-		return json.NewEncoder(w).Encode(graph.Schema)
+	if err := p.dumpToFile(jsonDumpPath, func(w io.Writer) error {
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(graph.Schema)
 	}); err != nil {
 		return fmt.Errorf("failed to dump json schema: %w", err)
 	}

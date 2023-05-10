@@ -64,7 +64,7 @@ func main() {
 	}
 	err := app.Run(os.Args)
 	if err != nil {
-		fmt.Println(err)
+		zap.L().Error(err.Error())
 		os.Exit(1)
 	}
 }
@@ -80,10 +80,12 @@ func NewBase(ctx *cli.Context, f flags) (baseCommand, error) {
 	if err != nil {
 		return empty, fmt.Errorf("create logger: %w", err)
 	}
+	zap.ReplaceGlobals(log)
 	cnf, err := ReadConfig(f.configPath.Get(ctx))
 	if err != nil {
 		return empty, fmt.Errorf("get config: %w", err)
 	}
+	log.Debug("config readed")
 
 	return baseCommand{
 		log: log,
@@ -99,6 +101,7 @@ func (b *baseCommand) connectDB(ctx *cli.Context, debug bool) (*pgx.Conn, error)
 	if err != nil {
 		return nil, fmt.Errorf("create database connection: %w", err)
 	}
+	b.log.Debug("connected to database")
 
 	return conn, nil
 }
