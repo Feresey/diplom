@@ -43,3 +43,5 @@ CREATE TABLE {{$table.Name}} (
 {{- /* range indexes */}}
 {{- end}}
 {{/* range tables */}}{{end}}
+
+{{- template "types.tpl" .Types}}

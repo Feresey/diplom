@@ -19,7 +19,6 @@ type TemplateName string
 
 const (
 	DumpSchemaTemplate TemplateName = "schema.sql.tpl"
-	DumpTypesTemplate  TemplateName = "types.tpl"
 	DumpGrapthTemplate TemplateName = "grapth.puml.tpl"
 )
 
@@ -159,8 +158,6 @@ func (g *Graph) Dump(w io.Writer, tplName TemplateName) error {
 	switch tplName {
 	case DumpSchemaTemplate:
 		data = g.Schema
-	case DumpTypesTemplate:
-		data = g.Schema.Types
 	case DumpGrapthTemplate:
 		data = g
 	default:

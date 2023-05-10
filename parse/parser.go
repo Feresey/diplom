@@ -659,8 +659,8 @@ func (p *Parser) makeCompositeType(
 	}()
 
 	return &schema.CompositeType{
-		TypeName:   compositeTypeName,
-		Attributes: make(map[string]*schema.CompositeAttribute),
+		TypeName: compositeTypeName,
+		// Attributes: make(map[string]*schema.CompositeAttribute),
 	}, nil
 }
 
