@@ -1,169 +1,121 @@
 package main
 
 import (
-	"context"
 	"encoding/csv"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/Feresey/mtest/generate"
-	"github.com/Feresey/mtest/parse"
-	"github.com/Feresey/mtest/schema"
 	"github.com/urfave/cli/v2"
-	"go.uber.org/fx"
+
+	"github.com/Feresey/mtest/generate"
+	"github.com/Feresey/mtest/schema"
 )
 
 type generateFlags struct {
 	flags
-	schemaDumpPath *cli.StringFlag
-	outputPath     *cli.StringFlag
+	schema     schemaLoaderFlags
+	outputPath *cli.StringFlag
 }
 
-func (f *generateFlags) Set() []cli.Flag {
-	return append(f.flags.Set(),
-		f.schemaDumpPath,
-		f.outputPath,
-	)
+type generateCommand struct {
+	flags generateFlags
+	baseCommand
+
+	schemaLoader schemaLoader
 }
 
-func GenerateCommand(f flags) *cli.Command {
-	gf := generateFlags{
-		flags: f,
-		schemaDumpPath: &cli.StringFlag{
-			Name:    "input",
-			Aliases: []string{"i"},
-		},
-		outputPath: &cli.StringFlag{
-			Name:        "output",
-			DefaultText: "stdout",
-			Usage:       "-o outdir",
-			Aliases:     []string{"o"},
+func NewGenerateCommand(f flags) *generateCommand {
+	return &generateCommand{
+		flags: generateFlags{
+			flags: f,
+			outputPath: &cli.StringFlag{
+				Name:     "output",
+				Required: true,
+				Usage:    "-o outdir",
+				Aliases:  []string{"o"},
+			},
+			schema: NewSchemaLoaderFlags(),
 		},
 	}
+}
 
+func (p *generateCommand) Command() *cli.Command {
 	return &cli.Command{
 		Name:        "generate",
 		Description: "generate records",
-		Flags:       gf.Set(),
-		Action: func(ctx *cli.Context) error {
-			log, err := newLogger(gf.Debug.Get(ctx))
-			if err != nil {
-				return err
-			}
-			cnf, err := ReadConfig(gf.Config.Get(ctx))
-			if err != nil {
-				return fmt.Errorf("read config: %w", err)
-			}
-			conf, err := NewFxConfig(cnf, gf.Debug.Get(ctx))
-			if err != nil {
-				return err
-			}
-
-			var (
-				parser       *parse.Parser
-				parserConfig parse.Config
-			)
-
-			app := NewApp(ctx, log, conf, gf.flags, fx.Populate(&log, &parser, &parserConfig))
-			return RunApp(ctx.Context, app, log, func(runCtx context.Context) error {
-				var graph *schema.Graph
-				dump := gf.schemaDumpPath.Get(ctx)
-				if dump == "" {
-					g, err := parseSchema(runCtx, log, parser, conf.Parser)
-					if err != nil {
-						return err
-					}
-					graph = g
-					// } else {
-					// TODO load parsed schema
-				}
-
-				// var out io.Writer = os.Stdout
-				// if output := f.outputPath.Get(ctx); output != "" {
-				// 	fileOut, err := os.Create(output)
-				// 	if err != nil {
-				// 		return err
-				// 	}
-				// 	defer fileOut.Close()
-				// 	out = fileOut
-				// }
-
-				gen, err := generate.New(log, graph)
-				if err != nil {
-					return err
-				}
-
-				records, err := gen.GenerateRecords(nil, nil)
-				if err != nil {
-					return err
-				}
-				return dumpRecordsCSV(records)
-			})
-		},
+		Flags: append(
+			p.flags.Set(),
+			p.flags.outputPath,
+			p.flags.schema.dumpPath,
+		),
+		Before: p.init,
+		Action: p.GenerateRecords,
 		Subcommands: []*cli.Command{
-			generateDefaultCommand(gf),
+			p.DefaultsCommand(),
 		},
 	}
 }
 
-func generateDefaultCommand(gf generateFlags) *cli.Command {
+func (p *generateCommand) init(ctx *cli.Context) error {
+	base, err := NewBase(ctx, p.flags.flags)
+	if err != nil {
+		return cli.Exit(err, 2)
+	}
+	p.baseCommand = base
+	p.schemaLoader = NewSchemaLoader(base)
+
+	return nil
+}
+
+func (p *generateCommand) GenerateRecords(ctx *cli.Context) error {
+	s, err := p.schemaLoader.GetSchema(ctx, p.flags.schema.dumpPath.Get(ctx))
+	if err != nil {
+		return err
+	}
+
+	graph := schema.NewGraph(s)
+
+	gen, err := generate.New(p.log, graph)
+	if err != nil {
+		return err
+	}
+
+	records, err := gen.GenerateRecords(nil, nil)
+	if err != nil {
+		return err
+	}
+	return dumpRecordsCSV(records)
+}
+
+func (p *generateCommand) DefaultsCommand() *cli.Command {
+	defaultChecks := &cli.StringSliceFlag{
+		Name:    "names",
+		Aliases: []string{"n"},
+		Usage:   `--names 'my_schema\.my_table.*,other_schema\..*,.*'`,
+	}
+
 	return &cli.Command{
 		Name:        "default",
 		Description: "generate default partial records",
-		Flags:       gf.Set(),
+		Flags: []cli.Flag{
+			defaultChecks,
+		},
 		Action: func(ctx *cli.Context) error {
-			log, err := newLogger(gf.Debug.Get(ctx))
+			s, err := p.schemaLoader.GetSchema(ctx, p.flags.schema.dumpPath.Get(ctx))
 			if err != nil {
 				return err
 			}
-			cnf, err := ReadConfig(gf.Config.Get(ctx))
-			if err != nil {
-				return fmt.Errorf("read config: %w", err)
-			}
-			conf, err := NewFxConfig(cnf, gf.Debug.Get(ctx))
+			graph := schema.NewGraph(s)
+
+			gen, err := generate.New(p.log, graph)
 			if err != nil {
 				return err
 			}
 
-			var (
-				parser       *parse.Parser
-				parserConfig parse.Config
-			)
+			checks := gen.GetDefaultChecks()
 
-			app := NewApp(ctx, log, conf, gf.flags, fx.Populate(&log, &parser, &parserConfig))
-			return RunApp(ctx.Context, app, log, func(runCtx context.Context) error {
-				var graph *schema.Graph
-				dump := gf.schemaDumpPath.Get(ctx)
-				if dump == "" {
-					g, err := parseSchema(runCtx, log, parser, conf.Parser)
-					if err != nil {
-						return err
-					}
-					graph = g
-					// } else {
-					// TODO load parsed schema
-				}
-
-				// var out io.Writer = os.Stdout
-				// if output := f.outputPath.Get(ctx); output != "" {
-				// 	fileOut, err := os.Create(output)
-				// 	if err != nil {
-				// 		return err
-				// 	}
-				// 	defer fileOut.Close()
-				// 	out = fileOut
-				// }
-
-				gen, err := generate.New(log, graph)
-				if err != nil {
-					return err
-				}
-
-				checks := gen.GetDefaultChecks()
-
-				return dumpChecksCSV(checks)
-			})
+			return dumpChecksCSV(checks)
 		},
 	}
 }

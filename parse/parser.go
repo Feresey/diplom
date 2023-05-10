@@ -7,7 +7,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/Feresey/mtest/db"
 	"github.com/Feresey/mtest/parse/queries"
 	"github.com/Feresey/mtest/schema"
 )
@@ -37,7 +36,7 @@ type Queries interface {
 }
 
 func NewParser(
-	conn *db.Conn,
+	conn queries.Executor,
 	log *zap.Logger,
 ) *Parser {
 	return &Parser{

@@ -51,5 +51,5 @@ func InstallTools() error {
 }
 
 func Lint() error {
-	return sh.RunV("golangci-lint", "run")
+	return sh.RunV("golangci-lint", "run", "-v")
 }

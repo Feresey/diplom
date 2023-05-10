@@ -2,54 +2,43 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/tracelog"
-	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 type Config struct {
 	Conn  string
-	Debug bool
+	debug bool
 }
 
-type Conn struct {
-	*pgx.Conn
-}
+func (c *Config) SetDebug(debug bool) { c.debug = debug }
 
 func NewDB(
-	lc fx.Lifecycle,
+	ctx context.Context,
 	logger *zap.Logger,
 	cfg Config,
-) (*Conn, error) {
-	var conn Conn
-
+) (*pgx.Conn, error) {
 	cnf, err := pgx.ParseConfig(cfg.Conn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
-	if cfg.Debug {
+	if cfg.debug {
 		cnf.Tracer = &tracelog.TraceLog{
 			Logger:   tracelog.LoggerFunc(queryMessageLog(logger)),
 			LogLevel: tracelog.LogLevelInfo,
 		}
 	}
 
-	lc.Append(fx.StartStopHook(
-		func(ctx context.Context) error {
-			c, err := pgx.ConnectConfig(ctx, cnf)
-			conn.Conn = c
-			return err
-		},
-		func(ctx context.Context) error {
-			return conn.Conn.Close(ctx)
-		},
-	))
-
-	return &conn, nil
+	c, err := pgx.ConnectConfig(ctx, cnf)
+	if err != nil {
+		return nil, fmt.Errorf("connect to database: %w", err)
+	}
+	return c, nil
 }
 
 func queryMessageLog(log *zap.Logger) func(

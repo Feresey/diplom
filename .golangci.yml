@@ -79,6 +79,8 @@ issues:
   exclude-rules:
     - linters: [lll]
       source: "//.*$"
+    - linters: [govet]
+      source: "if .*err :?= .*;.*err != nil"
 
 linters:
   disable-all: true

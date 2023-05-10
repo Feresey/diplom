@@ -256,10 +256,6 @@ func getValueFormat[T fmt.Stringer](
 	return value, nil
 }
 
-func getType[T fmt.Stringer](typename string, m map[string]T) (T, error) {
-	return getValueFormat(m, typename, "type %q not found", typename)
-}
-
 func getElemType[T fmt.Stringer](
 	basename, basetype string,
 	typename string,
@@ -269,19 +265,248 @@ func getElemType[T fmt.Stringer](
 		"%s type %q not found for type %s", basename, typename, basetype)
 }
 
-type elemTyper interface {
+func fillElemType[T interface {
 	fmt.Stringer
 	GetElemType() *DBType
 	SetElemType(elem *DBType)
-}
-
-func fillElemType[T elemTyper](s *Schema, base T) error {
+}](
+	m map[string]*DBType, base T,
+) error {
 	if elem := base.GetElemType(); elem != nil {
-		typ, err := getType(elem.String(), s.Types)
+		typ, err := getValueFormat(m, elem.String(),
+			"elem type %q not found for type %q", elem, base)
 		if err != nil {
-			return fmt.Errorf("get elem type for %q: %w", base, err)
+			return err
 		}
 		base.SetElemType(typ)
+	}
+	return nil
+}
+
+func (s *Schema) fillConcreteTypes() error {
+	for _, typ := range s.ArrayTypes {
+		if err := fillElemType(s.Types, typ); err != nil {
+			return err
+		}
+	}
+	for _, typ := range s.DomainTypes {
+		if err := fillElemType(s.Types, typ); err != nil {
+			return err
+		}
+	}
+	for _, typ := range s.RangeTypes {
+		if err := fillElemType(s.Types, typ); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Schema) fillTypes() error {
+	for _, typ := range s.Types {
+		var err error
+		switch {
+		case typ.ArrayType != nil:
+			typ.ArrayType, err = getElemType(
+				"array", typ.String(),
+				typ.ArrayType.String(), s.ArrayTypes)
+		case typ.CompositeType != nil:
+			typ.CompositeType, err = getElemType(
+				"composite", typ.String(),
+				typ.CompositeType.String(), s.CompositeTypes)
+		case typ.DomainType != nil:
+			typ.DomainType, err = getElemType(
+				"domain", typ.String(),
+				typ.DomainType.String(), s.DomainTypes)
+		case typ.EnumType != nil:
+			typ.EnumType, err = getElemType(
+				"enum", typ.String(),
+				typ.EnumType.String(), s.EnumTypes)
+		case typ.RangeType != nil:
+			typ.RangeType, err = getElemType(
+				"range", typ.String(),
+				typ.RangeType.String(), s.RangeTypes)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func fillColumns(dst, src map[string]*Column, msg string, args ...any) error {
+	for colName := range dst {
+		col, err := getValueFormat(src, colName,
+			"column %q not found for"+msg, append([]any{colName}, args...))
+		if err != nil {
+			return err
+		}
+		dst[colName] = col
+	}
+	return nil
+}
+
+func (s *Schema) fillIndexes() error {
+	for _, index := range s.Indexes {
+		if index.Table == nil {
+			return fmt.Errorf("table not specified for index %q", index)
+		}
+		table, err := getValueFormat(s.Tables, index.Table.String(),
+			"table %q not found for index %q", index.Table, index)
+		if err != nil {
+			return err
+		}
+		index.Table = table
+
+		err = fillColumns(index.Columns, table.Columns,
+			"table %q in index %q", index.Table, index)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Schema) fillConstraints() error {
+	for _, constraint := range s.Constraints {
+		if constraint.Table == nil {
+			return fmt.Errorf("table not specified for constraint %q", constraint)
+		}
+		table, err := getValueFormat(s.Tables, constraint.Table.String(),
+			"table %q not found for constraint %q", constraint.Table, constraint)
+		if err != nil {
+			return err
+		}
+		constraint.Table = table
+
+		err = fillColumns(constraint.Columns, table.Columns,
+			"table %q in constraint %q", constraint.Table, constraint)
+		if err != nil {
+			return err
+		}
+
+		if constraint.Index != nil {
+			index, err := getValueFormat(s.Indexes, constraint.Index.String(),
+				"index %q not found for constraint %q", constraint.Index, constraint)
+			if err != nil {
+				return err
+			}
+			constraint.Index = index
+		}
+	}
+	return nil
+}
+
+func (s *Schema) fillTableColumns(table *Table) error {
+	for colname, col := range table.Columns {
+		col.Table = table
+		typ, err := getValueFormat(s.Types, col.Type.String(),
+			"type %q not found for column %q in table %q ",
+			col.Type, colname, table)
+		if err != nil {
+			return err
+		}
+		col.Type = typ
+	}
+	return nil
+}
+
+func (s *Schema) fillTableConstraints(table *Table) error {
+	for conname := range table.Constraints {
+		constraint, err := getValueFormat(s.Constraints, conname,
+			"constraint %q not found for table %q", conname, table)
+		if err != nil {
+			return err
+		}
+		table.Constraints[conname] = constraint
+	}
+	return nil
+}
+
+func (s *Schema) fillTableIndexes(table *Table) error {
+	for indname := range table.Indexes {
+		index, err := getValueFormat(s.Indexes, indname,
+			"index %q not found for table %q", indname, table)
+		if err != nil {
+			return err
+		}
+		table.Indexes[indname] = index
+	}
+	return nil
+}
+
+func (s *Schema) fillTableFk(table *Table) error {
+	for fkname, fk := range table.ForeignKeys {
+		fkey, err := getValueFormat(s.Constraints, fkname,
+			"fk %q not found for table %q", fkname, table)
+		if err != nil {
+			return err
+		}
+		fk.Foreign = fkey
+		ref, err := getValueFormat(s.Tables, fk.Reference.String(),
+			"table %q not found for fk %q for table %q",
+			fk.Reference, fkname, table)
+		if err != nil {
+			return err
+		}
+		fk.Reference = ref
+
+		err = fillColumns(fk.ReferenceColumns, ref.Columns,
+			"for fk table %q for fk %q in table %q", ref, fkname, table)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Schema) fillTableRefers(table *Table) error {
+	for conname := range table.ReferencedBy {
+		constraint, err := getValueFormat(s.Constraints, conname,
+			"referenced by constraint %q not found for table %q",
+			conname, table.Name)
+		if err != nil {
+			return err
+		}
+		table.ReferencedBy[conname] = constraint
+	}
+	return nil
+}
+
+func (s *Schema) fillTable(table *Table) error {
+	if err := s.fillTableColumns(table); err != nil {
+		return err
+	}
+	if err := s.fillTableConstraints(table); err != nil {
+		return err
+	}
+	if err := s.fillTableIndexes(table); err != nil {
+		return err
+	}
+	if err := s.fillTableFk(table); err != nil {
+		return err
+	}
+	if err := s.fillTableRefers(table); err != nil {
+		return err
+	}
+
+	pk, err := getValueFormat(s.Constraints, table.PrimaryKey.String(),
+		"primary key %q not found for table %q",
+		table.PrimaryKey, table)
+	if err != nil {
+		return err
+	}
+	table.PrimaryKey = pk
+
+	return nil
+}
+
+func (s *Schema) fillTables() error {
+	for _, table := range s.Tables {
+		if err := s.fillTable(table); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -294,178 +519,20 @@ func (s *Schema) UnmarshalJSON(data []byte) error {
 	}
 	*s = Schema(temp)
 
-	for _, typ := range s.ArrayTypes {
-		if err := fillElemType(s, typ); err != nil {
-			return err
-		}
+	if err := s.fillConcreteTypes(); err != nil {
+		return err
 	}
-	for _, typ := range s.DomainTypes {
-		if err := fillElemType(s, typ); err != nil {
-			return err
-		}
+	if err := s.fillTypes(); err != nil {
+		return err
 	}
-	for _, typ := range s.RangeTypes {
-		if err := fillElemType(s, typ); err != nil {
-			return err
-		}
+	if err := s.fillIndexes(); err != nil {
+		return err
 	}
-
-	for _, typ := range s.Types {
-		var err error
-		switch {
-		case typ.ArrayType != nil:
-			typ.ArrayType, err = getElemType(
-				"array", typ.String(),
-				typ.ArrayType.String(), s.ArrayTypes)
-		case typ.CompositeType != nil:
-			typ.CompositeType, err = getElemType(
-				"array", typ.String(),
-				typ.CompositeType.String(), s.CompositeTypes)
-		case typ.DomainType != nil:
-			typ.DomainType, err = getElemType(
-				"array", typ.String(),
-				typ.DomainType.String(), s.DomainTypes)
-		case typ.EnumType != nil:
-			typ.EnumType, err = getElemType(
-				"array", typ.String(),
-				typ.EnumType.String(), s.EnumTypes)
-		case typ.RangeType != nil:
-			typ.RangeType, err = getElemType(
-				"array", typ.String(),
-				typ.RangeType.String(), s.RangeTypes)
-		}
-		if err != nil {
-			return err
-		}
+	if err := s.fillConstraints(); err != nil {
+		return err
 	}
-
-	for _, index := range s.Indexes {
-		if index.Table == nil {
-			return fmt.Errorf("table not specified for index %q", index)
-		}
-		table, err := getValueFormat(s.Tables, index.Table.String(),
-			"table %q not found for index %q", index.Table, index)
-		if err != nil {
-			return err
-		}
-		index.Table = table
-
-		for colName := range index.Columns {
-			col, err := getValueFormat(table.Columns, colName,
-				"column %q not found for table %q in index %q",
-				colName, index.Table, index)
-			if err != nil {
-				return err
-			}
-			index.Columns[colName] = col
-		}
+	if err := s.fillTables(); err != nil {
+		return err
 	}
-
-	for _, constraint := range s.Constraints {
-		if constraint.Table == nil {
-			return fmt.Errorf("table not specified for constraint %q", constraint)
-		}
-		table, err := getValueFormat(s.Tables, constraint.Table.String(),
-			"table %q not found for constraint %q", constraint.Table, constraint)
-		if err != nil {
-			return err
-		}
-		constraint.Table = table
-
-		for colName := range constraint.Columns {
-			col, err := getValueFormat(table.Columns, colName,
-				"column %q not found for table %q in constraint %q",
-				colName, constraint.Table, constraint)
-			if err != nil {
-				return err
-			}
-			constraint.Columns[colName] = col
-		}
-
-		if constraint.Index != nil {
-			index, err := getValueFormat(s.Indexes, constraint.Index.String(),
-				"index %q not found for constraint %q", constraint.Index, constraint)
-			if err != nil {
-				return err
-			}
-			constraint.Index = index
-		}
-	}
-
-	for _, table := range s.Tables {
-		for colname, col := range table.Columns {
-			col.Table = table
-			typ, err := getValueFormat(s.Types, col.Type.String(),
-				"type %q not found for column %q in table %q ",
-				col.Type, colname, table)
-			if err != nil {
-				return err
-			}
-			col.Type = typ
-		}
-
-		for conname := range table.Constraints {
-			constraint, err := getValueFormat(s.Constraints, conname,
-				"constraint %q not found for table %q", conname, table)
-			if err != nil {
-				return err
-			}
-			table.Constraints[conname] = constraint
-		}
-
-		for indname := range table.Indexes {
-			index, err := getValueFormat(s.Indexes, indname,
-				"index %q not found for table %q", indname, table)
-			if err != nil {
-				return err
-			}
-			table.Indexes[indname] = index
-		}
-
-		for fkname, fk := range table.ForeignKeys {
-			fkey, err := getValueFormat(s.Constraints, fkname,
-				"fk %q not found for table %q", fkname, table)
-			if err != nil {
-				return err
-			}
-			fk.Foreign = fkey
-			ref, err := getValueFormat(s.Tables, fk.Reference.String(),
-				"table %q not found for fk %q for table %q",
-				fk.Reference, fkname, table)
-			if err != nil {
-				return err
-			}
-			fk.Reference = ref
-
-			for colname := range fk.ReferenceColumns {
-				col, err := getValueFormat(ref.Columns, colname,
-					"column %q not found in table %q for fk %q in table %q",
-					colname, ref, fkname, table)
-				if err != nil {
-					return err
-				}
-				fk.ReferenceColumns[colname] = col
-			}
-		}
-
-		for conname := range table.ReferencedBy {
-			constraint, err := getValueFormat(s.Constraints, conname,
-				"referenced by constraint %q not found for table %q",
-				conname, table.Name)
-			if err != nil {
-				return err
-			}
-			table.ReferencedBy[conname] = constraint
-		}
-
-		pk, err := getValueFormat(s.Constraints, table.PrimaryKey.String(),
-			"primary key %q not found for table %q",
-			table.PrimaryKey, table)
-		if err != nil {
-			return err
-		}
-		table.PrimaryKey = pk
-	}
-
 	return nil
 }

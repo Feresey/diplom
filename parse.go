@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,138 +8,135 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/urfave/cli/v2"
+
 	"github.com/Feresey/mtest/parse"
 	"github.com/Feresey/mtest/parse/queries"
 	"github.com/Feresey/mtest/schema"
-	"github.com/urfave/cli/v2"
-	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
-func ParseCommand(f flags) *cli.Command {
-	outputPath := &cli.StringFlag{
-		Name:    "output",
-		Aliases: []string{"o"},
-	}
-	dumpFlag := &cli.BoolFlag{
-		Name:    "dump",
-		Aliases: []string{"d"},
-	}
+type parseFlags struct {
+	flags
+	outputPath *cli.StringFlag
+}
 
-	jsonDumpFlag := &cli.BoolFlag{
-		Name: "json",
-	}
+func (pf *parseFlags) Set() []cli.Flag {
+	return append(pf.flags.Set(),
+		pf.outputPath,
+	)
+}
 
-	return &cli.Command{
-		Name:        "parse",
-		Description: "parse schema",
-		Flags: append(f.Set(),
-			outputPath,
-			dumpFlag,
-			jsonDumpFlag,
-		),
-		Action: func(ctx *cli.Context) error {
-			log, err := newLogger(f.Debug.Get(ctx))
-			if err != nil {
-				return err
-			}
-			cnf, err := ReadConfig(f.Config.Get(ctx))
-			if err != nil {
-				return fmt.Errorf("read config: %w", err)
-			}
-			conf, err := NewFxConfig(cnf, f.Debug.Get(ctx))
-			if err != nil {
-				return err
-			}
+type parseCommand struct {
+	pf parseFlags
+	baseCommand
 
-			var (
-				parser       *parse.Parser
-				parserConfig parse.Config
-			)
+	conn *pgx.Conn
+}
 
-			app := NewApp(ctx, log, conf, f, fx.Populate(&log, &parser, &parserConfig))
-			return RunApp(ctx.Context, app, log, func(runCtx context.Context) error {
-				g, err := parseSchema(runCtx, log, parser, conf.Parser)
-				if err != nil {
-					return err
-				}
-
-				if jsonDumpFlag.Get(ctx) {
-					var out io.Writer
-					jDump := outputPath.Get(ctx)
-					if jDump == "" {
-						out = os.Stdout
-					} else {
-						fileOut, err := os.Create(jDump)
-						if err != nil {
-							return err
-						}
-						defer fileOut.Close()
-						out = fileOut
-					}
-
-					return json.NewEncoder(out).Encode(g)
-				}
-				if dumpFlag.Get(ctx) {
-					return dumpToFiles(g, log, outputPath.Get(ctx))
-				}
-
-				return nil
-			})
+func NewParseCommand(f flags) *parseCommand {
+	return &parseCommand{
+		pf: parseFlags{
+			flags: f,
+			outputPath: &cli.StringFlag{
+				Name:        "output",
+				DefaultText: "dump",
+				Required:    true,
+				Aliases:     []string{"o"},
+			},
 		},
 	}
 }
 
-func parseSchema(
-	ctx context.Context,
-	log *zap.Logger,
-	parser *parse.Parser,
-	pc parse.Config,
-) (*schema.Graph, error) {
-	s, err := parser.LoadSchema(ctx, pc)
-	if err != nil {
-		log.Error(err.Error())
-		var pErr queries.Error
-		if errors.As(err, &pErr) {
-			log.Error(pErr.Pretty())
-			// TODO экзит коды
-			return nil, err
-		}
-
-		return nil, fmt.Errorf("error loading schema: %w", err)
+func (p *parseCommand) Command() *cli.Command {
+	return &cli.Command{
+		Name:        "parse",
+		Description: "parse schema",
+		Flags:       p.pf.Set(),
+		Before:      p.init,
+		Action:      p.run,
+		After:       p.cleanup,
 	}
-	return schema.NewGraph(s), nil
 }
 
-func dumpToFiles(g *schema.Graph, log *zap.Logger, dumpPath string) error {
-	slog := log.Sugar()
+func (p *parseCommand) init(ctx *cli.Context) error {
+	base, err := NewBase(ctx, p.pf.flags)
+	if err != nil {
+		return cli.Exit(err, 2)
+	}
+	conn, err := base.connectDB(ctx, p.pf.debug.Get(ctx))
+	if err != nil {
+		return cli.Exit(err, 3)
+	}
+	p.baseCommand = base
+	p.conn = conn
+	return nil
+}
 
-	if err := createDirIfNotExist(dumpPath); err != nil {
+func (p *parseCommand) cleanup(ctx *cli.Context) error {
+	if p.conn == nil {
+		return nil
+	}
+	if err := p.conn.Close(ctx.Context); err != nil {
+		return fmt.Errorf("close pgx conn: %w", err)
+	}
+	return nil
+}
+
+func (p *parseCommand) run(ctx *cli.Context) error {
+	parser := parse.NewParser(p.conn, p.log)
+	s, err := parser.LoadSchema(ctx.Context, p.cnf.Parser)
+	if err != nil {
+		var pErr queries.Error
+		if errors.As(err, &pErr) {
+			p.log.Error(pErr.Pretty())
+		}
+		return fmt.Errorf("parse schema: %w", err)
+	}
+	p.log.Info("schema parsed")
+
+	g := schema.NewGraph(s)
+
+	if _, err := g.TopologicalSort(); err != nil {
+		return fmt.Errorf("try to determine tables order: %w", err)
+	}
+
+	outputPath := p.pf.outputPath.Get(ctx)
+
+	return p.dump(g, outputPath)
+}
+
+func (p *parseCommand) dump(graph *schema.Graph, dumpPath string) error {
+	slog := p.log.Sugar()
+
+	if err := p.createDirIfNotExist(dumpPath); err != nil {
 		return fmt.Errorf("create dump dir: %w", err)
 	}
 
 	schemaDumpPath := filepath.Join(dumpPath, "schema.sql")
-	slog.Infof("dump schema to %q", schemaDumpPath)
-	if err := dumpToFile(schemaDumpPath, g, schema.DumpSchemaTemplate); err != nil {
-		return fmt.Errorf("failed to dump schema: %w", err)
-	}
-
-	typesDumpPath := filepath.Join(dumpPath, "types.txt")
-	slog.Infof("dump types to %q", typesDumpPath)
-	if err := dumpToFile(typesDumpPath, g, schema.DumpTypesTemplate); err != nil {
-		return fmt.Errorf("failed to dump types: %w", err)
+	slog.Infof("dump sql to %q", schemaDumpPath)
+	if err := p.dumpTemplate(schemaDumpPath, graph, schema.DumpSchemaTemplate); err != nil {
+		return fmt.Errorf("failed to dump sql schema: %w", err)
 	}
 
 	graphDumpPath := filepath.Join(dumpPath, "graph.puml")
 	slog.Infof("dump graph to %q", graphDumpPath)
-	if err := dumpToFile(graphDumpPath, g, schema.DumpGrapthTemplate); err != nil {
+	if err := p.dumpTemplate(graphDumpPath, graph, schema.DumpGrapthTemplate); err != nil {
 		return fmt.Errorf("failed to dump grapth: %w", err)
+	}
+
+	jsonDumpPath := filepath.Join(dumpPath, "dump.json")
+	slog.Infof("dump schema to %q", jsonDumpPath)
+	if err := p.dumpToFile(graphDumpPath, func(w io.Writer) error {
+		return json.NewEncoder(w).Encode(graph.Schema)
+	}); err != nil {
+		return fmt.Errorf("failed to dump json schema: %w", err)
 	}
 
 	return nil
 }
 
-func createDirIfNotExist(path string) error {
+func (p *parseCommand) createDirIfNotExist(path string) error {
 	fileInfo, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		// Папка не существует, создаем ее
@@ -155,7 +151,16 @@ func createDirIfNotExist(path string) error {
 	return nil
 }
 
-func dumpToFile(fileName string, g *schema.Graph, tpl schema.TemplateName) (err error) {
+func (p *parseCommand) dumpTemplate(
+	fileName string,
+	g *schema.Graph, tpl schema.TemplateName,
+) (err error) {
+	return p.dumpToFile(fileName, func(w io.Writer) error {
+		return g.Dump(w, tpl)
+	})
+}
+
+func (p *parseCommand) dumpToFile(fileName string, f func(w io.Writer) error) (err error) {
 	file, err := os.Create(fileName)
 	if err != nil {
 		return fmt.Errorf("create output file for dump: %w", err)
@@ -164,5 +169,5 @@ func dumpToFile(fileName string, g *schema.Graph, tpl schema.TemplateName) (err 
 		err = errors.Join(err, file.Close())
 	}()
 
-	return g.Dump(file, tpl)
+	return f(file)
 }

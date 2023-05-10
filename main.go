@@ -1,21 +1,14 @@
 package main
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
-	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/Feresey/mtest/db"
-	"github.com/Feresey/mtest/parse"
+	"github.com/jackc/pgx/v5"
 	"github.com/urfave/cli/v2"
 )
 
@@ -31,57 +24,32 @@ func newLogger(debug bool) (*zap.Logger, error) {
 	return lc.Build()
 }
 
-type ErrorHandler struct {
-	log   *zap.Logger
-	debug bool
-}
-
-func (e ErrorHandler) HandleError(err error) {
-	e.log.Error(err.Error())
-	if e.debug {
-		vis, verr := fx.VisualizeError(err)
-		e.log.Info(vis, zap.Error(verr))
-	}
-}
-
 type flags struct {
-	Config       *cli.StringFlag
-	Debug        *cli.BoolFlag
-	StartTimeout *cli.DurationFlag
-	StopTimeout  *cli.DurationFlag
+	configPath *cli.StringFlag
+	debug      *cli.BoolFlag
 }
 
 func (f *flags) Set() []cli.Flag {
 	return []cli.Flag{
-		f.Config,
-		f.Debug,
-		f.StartTimeout,
-		f.StopTimeout,
+		f.configPath,
+		f.debug,
 	}
 }
 
 func main() {
 	f := flags{
-		Config: &cli.StringFlag{
+		configPath: &cli.StringFlag{
 			Name:      "config",
 			Value:     "mtest.yml",
 			Usage:     "config file path",
 			TakesFile: true,
 			Aliases:   []string{"c"},
 		},
-		Debug: &cli.BoolFlag{
+		debug: &cli.BoolFlag{
 			Name:   "debug",
 			Value:  false,
 			Usage:  "show debug information",
 			Hidden: true,
-		},
-		StartTimeout: &cli.DurationFlag{
-			Name:  "start-timeout",
-			Value: 5 * time.Second,
-		},
-		StopTimeout: &cli.DurationFlag{
-			Name:  "stop-timeout",
-			Value: 5 * time.Second,
 		},
 	}
 
@@ -90,8 +58,8 @@ func main() {
 		Description: "migration test tool",
 		Flags:       f.Set(),
 		Commands: []*cli.Command{
-			ParseCommand(f),
-			GenerateCommand(f),
+			NewParseCommand(f).Command(),
+			NewGenerateCommand(f).Command(),
 		},
 	}
 	err := app.Run(os.Args)
@@ -101,67 +69,36 @@ func main() {
 	}
 }
 
-func NewApp(
-	ctx *cli.Context,
-	log *zap.Logger,
-	cnf FxConfig,
-	f flags,
-	populate fx.Option,
-) *fx.App {
-	return fx.New(
-		fx.Supply(
-			log,
-			cnf,
-		),
-		fx.WithLogger(func(logger *zap.Logger) fxevent.Logger {
-			l := &fxevent.ZapLogger{Logger: logger}
-			l.UseErrorLevel(zap.DebugLevel)
-			l.UseLogLevel(zap.DebugLevel)
-			return l
-		}),
-		fx.Provide(
-			db.NewDB,
-			parse.NewParser,
-		),
-		fx.StartTimeout(f.StartTimeout.Get(ctx)),
-		fx.StopTimeout(f.StopTimeout.Get(ctx)),
-		fx.ErrorHook(ErrorHandler{
-			log:   log,
-			debug: f.Debug.Get(ctx),
-		}),
-
-		populate,
-	)
+type baseCommand struct {
+	log *zap.Logger
+	cnf *AppConfig
 }
 
-func RunApp(
-	ctx context.Context,
-	app *fx.App,
-	log *zap.Logger,
-	run func(ctx context.Context) error,
-) (runErr error) {
-	runCtx, cancel := context.WithCancel(ctx)
-	go func() {
-		<-app.Done()
-		cancel()
-	}()
-
-	err := app.Start(runCtx)
+func NewBase(ctx *cli.Context, f flags) (baseCommand, error) {
+	var empty baseCommand
+	log, err := newLogger(f.debug.Get(ctx))
 	if err != nil {
-		return fmt.Errorf("start app: %w", err)
+		return empty, fmt.Errorf("create logger: %w", err)
 	}
-	log.Debug("app started")
+	cnf, err := ReadConfig(f.configPath.Get(ctx))
+	if err != nil {
+		return empty, fmt.Errorf("get config: %w", err)
+	}
 
-	defer func() {
-		stopCtx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-		defer cancel()
+	return baseCommand{
+		log: log,
+		cnf: cnf,
+	}, nil
+}
 
-		err = app.Stop(stopCtx)
-		if err != nil {
-			runErr = errors.Join(runErr, err)
-		}
-		log.Debug("app stopped gracefullty")
-	}()
+func (b *baseCommand) connectDB(ctx *cli.Context, debug bool) (*pgx.Conn, error) {
+	if debug {
+		b.cnf.DB.SetDebug(true)
+	}
+	conn, err := db.NewDB(ctx.Context, b.log, b.cnf.DB)
+	if err != nil {
+		return nil, fmt.Errorf("create database connection: %w", err)
+	}
 
-	return run(runCtx)
+	return conn, nil
 }

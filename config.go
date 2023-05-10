@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 
-	"go.uber.org/fx"
 	"gopkg.in/yaml.v3"
 
 	"github.com/Feresey/mtest/db"
@@ -17,45 +16,45 @@ type FileConfig struct {
 	Patterns []string `yaml:"parser"`
 }
 
-func ReadConfig(confPath string) (FileConfig, error) {
-	var fc FileConfig
-	file, err := os.ReadFile(confPath)
-	if err != nil {
-		return fc, err
-	}
-
-	err = yaml.Unmarshal(file, &fc)
-	return fc, err
-}
-
-type FxConfig struct {
-	fx.Out
-
+type AppConfig struct {
 	DB     db.Config
 	Parser parse.Config
 }
 
-func NewFxConfig(
-	fc FileConfig,
-	debug bool,
-) (FxConfig, error) {
-	out := FxConfig{
-		DB: db.Config{
-			Conn:  fc.DBConn,
-			Debug: debug,
-		},
-		Parser: parse.Config{},
-	}
-	patterns, err := parsePatterns(fc.Patterns)
+func (fc FileConfig) Build() (*AppConfig, error) {
+	patterns, err := fc.parsePatterns(fc.Patterns)
 	if err != nil {
-		return out, err
+		return nil, fmt.Errorf("parse patterns failed: %w", err)
 	}
-	out.Parser.Patterns = patterns
-
-	return out, nil
+	return &AppConfig{
+		DB: db.Config{
+			Conn: fc.DBConn,
+		},
+		Parser: parse.Config{
+			Patterns: patterns,
+		},
+	}, nil
 }
 
-func parsePatterns(
+func ReadConfig(confPath string) (*AppConfig, error) {
+	var fc FileConfig
+	file, err := os.ReadFile(confPath)
+	if err != nil {
+		return nil, fmt.Errorf("read config file: %w", err)
+	}
+
+	if err := yaml.Unmarshal(file, &fc); err != nil {
+		return nil, fmt.Errorf("parse config: %w", err)
+	}
+
+	c, err := fc.Build()
+	if err != nil {
+		return nil, fmt.Errorf("process config data: %w", err)
+	}
+	return c, nil
+}
+
+func (fc FileConfig) parsePatterns(
 	patterns []string,
 ) ([]parse.Pattern, error) {
 	res := make([]parse.Pattern, 0, len(patterns))
