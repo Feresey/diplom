@@ -36,3 +36,17 @@
     {{- /* with attributes */}}
     {{- end}}
 {{- end}}
+
+{{- define "smalltype"}}
+    {{- $column := $}}
+    {{- $type := $column.Type}}
+    {{- if eq $type.TypeName.Schema "pg_catalog"}}
+        {{- $type.TypeName.Name}}
+    {{- else}}
+        {{- $type}}
+    {{- end}}
+    {{- with $column.Attributes}}
+        {{- if .HasCharMaxLength}}({{.CharMaxLength}}){{end}}
+        {{- if .IsNumeric -}}({{.NumericPrecision}},{{.NumericScale}}){{end}}
+    {{- end}}
+{{- end}}

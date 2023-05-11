@@ -24,17 +24,13 @@ func (g *Graph) build() {
 	for tablename, table := range g.Schema.Tables {
 		foreignTables := make(map[string]*Table, len(table.ForeignKeys))
 		g.Graph[tablename] = foreignTables
-		for _, fk := range table.ForeignKeys {
-			foreignTables[fk.Foreign.Table.Name.String()] = fk.Reference
+		for _, ref := range table.ReferencedBy {
+			foreignTables[ref.Table.String()] = ref.Table
 		}
 	}
 }
 
-//nolint:gocyclo // algo
-func (g *Graph) TopologicalSort() ([]string, error) {
-	// Create a slice to store the result
-	result := make([]string, 0, len(g.Graph))
-
+func (g *Graph) GetDepth() map[string]int {
 	// Initialize indegrees
 	inDegrees := make(map[string]int)
 	for parent, neighbors := range g.Graph {
@@ -46,6 +42,15 @@ func (g *Graph) TopologicalSort() ([]string, error) {
 			inDegrees[neighbor]++
 		}
 	}
+	return inDegrees
+}
+
+func (g *Graph) TopologicalSort() ([]string, error) {
+	// Create a slice to store the result
+	result := make([]string, 0, len(g.Graph))
+
+	// Initialize indegrees
+	inDegrees := g.GetDepth()
 
 	// sorted order
 	keys := make([]string, 0, len(g.Graph))

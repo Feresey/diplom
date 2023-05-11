@@ -64,6 +64,8 @@ func NewSchemaLoader(
 	return s, err
 }
 
+const stdinFileName = "-"
+
 func (p *SchemaLoader) Init(ctx *cli.Context, flags flags, sflags SchemaLoaderFlags) error {
 	if sflags.dumpPath.Get(ctx) == "" {
 		conn, err := p.connectDB(ctx, flags.debug.Get(ctx))
@@ -100,7 +102,7 @@ func (p *SchemaLoader) getSchemaFromFile(filename string) (s *schema.Schema, err
 	p.log.Debug("load schema from file", zap.String("filename", filename))
 	defer p.log.Info("schema loaded", zap.Error(err), zap.String("filename", filename))
 	var in io.Reader
-	if filename == "-" {
+	if filename == stdinFileName {
 		in = os.Stdin
 	} else {
 		fileData, err := os.ReadFile(filename)

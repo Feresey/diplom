@@ -89,7 +89,7 @@ func (p *ParseCommand) Run(ctx *cli.Context) error {
 	if err != nil {
 		var pErr queries.Error
 		if errors.As(err, &pErr) {
-			p.log.Error(pErr.Pretty())
+			println(pErr.Pretty())
 		}
 		return fmt.Errorf("parse schema: %w", err)
 	}
@@ -124,6 +124,10 @@ func (p *ParseCommand) dump(graph *schema.Graph, dumpPath string) error {
 	if err := p.dumpTemplate(graphDumpPath, graph, schema.DumpGrapthTemplate); err != nil {
 		return fmt.Errorf("failed to dump grapth: %w", err)
 	}
+
+	// for name ,elem := range graph.Graph {
+
+	// }
 
 	jsonDumpPath := filepath.Join(dumpPath, "dump.json")
 	slog.Infof("dump schema to %q", jsonDumpPath)

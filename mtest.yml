@@ -1,8 +1,9 @@
-dbconn: "postgresql://postgres:postgres@localhost:5432"
+dbconn: "postgresql://postgres:postgres@localhost:5432/scanner-vulndb"
 parser:
   # - pg_catalog
-  - test
-  - public
+  # - test
+  # - public
+  - vuln
 generator:
   # checks: merge
   checks: spare

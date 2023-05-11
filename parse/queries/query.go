@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -26,7 +27,7 @@ func (e Error) Error() string {
 }
 
 func (e Error) Pretty() string {
-	return fmt.Sprintf("%s: %v:\nquery:\n%s\n\n===\nargs: %+#v", e.Message, e.Err, e.Query, e.Args)
+	return fmt.Sprintf("%s: %v:\nquery:\n%s\n\n===\nargs: %s", e.Message, e.Err, e.Query, spew.Sdump(e.Args...))
 }
 
 func QueryAll[T any](
