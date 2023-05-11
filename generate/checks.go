@@ -83,13 +83,11 @@ var Checks = map[string][]string{
 // GetDefaultChecks генерирует дефолтные проверки для всех таблиц.
 func (g *Generator) GetDefaultChecks() map[string]PartialRecords {
 	res := make(map[string]PartialRecords, len(g.order))
-	for _, tableName := range g.order {
-		table := g.tables[tableName]
-
+	for _, table := range g.order {
 		checks := g.getDefaultTableChecks(table)
 		// TODO configure mergeChecks
 		records := g.transformChecks(table, checks, true)
-		res[tableName] = records
+		res[table.Name.String()] = records
 	}
 	return res
 }
@@ -100,12 +98,12 @@ func (g *Generator) getDefaultTableChecks(table *schema.Table) map[string]*Colum
 
 	foreignColumns := make(map[string]struct{}, len(table.Columns))
 	for _, fk := range table.ForeignKeys {
-		for colName := range fk.Foreign.Columns {
-			foreignColumns[colName] = struct{}{}
+		for _, col := range fk.Foreign.Columns {
+			foreignColumns[col.Name] = struct{}{}
 		}
 	}
 
-	for colName, col := range table.Columns {
+	for _, col := range table.Columns {
 		check := &ColumnChecks{}
 		attr := col.Attributes
 
@@ -117,10 +115,10 @@ func (g *Generator) getDefaultTableChecks(table *schema.Table) map[string]*Colum
 		if col.Type.TypeName.Schema != "pg_catalog" {
 			continue
 		}
-		checks[colName] = check
+		checks[col.Name] = check
 
 		// Для FK колонок нельзя делать обычные проверки на значения, т.к. они зависят от других таблиц.
-		if _, ok := foreignColumns[colName]; ok {
+		if _, ok := foreignColumns[col.Name]; ok {
 			continue
 		}
 		g.getTypeChecks(check, col.Type)
@@ -167,7 +165,7 @@ func (g *Generator) transformChecks(
 	}
 
 	for idx := range res {
-		sortPartialByNames(res[idx], table.ColumnNames)
+		sortPartialByNames(res[idx], table.Columns)
 	}
 
 	return res

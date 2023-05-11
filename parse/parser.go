@@ -29,10 +29,11 @@ type Parser struct {
 //go:generate mockery --name Queries --inpackage --testonly --with-expecter --quiet
 type Queries interface {
 	Tables(context.Context, queries.Executor, []queries.TablesPattern) ([]queries.Tables, error)
-	Columns(context.Context, queries.Executor, []string) ([]queries.Column, error)
-	Constraints(context.Context, queries.Executor, []string) ([]queries.Constraint, error)
-	Types(context.Context, queries.Executor, []string) ([]queries.Type, error)
-	Indexes(context.Context, queries.Executor, []string, []string) ([]queries.Index, error)
+	Columns(context.Context, queries.Executor, []int) ([]queries.Column, error)
+	Constraints(context.Context, queries.Executor, []int) ([]queries.Constraint, error)
+	Types(context.Context, queries.Executor, []int) ([]queries.Type, error)
+	Indexes(context.Context, queries.Executor, []int, []int) ([]queries.Index, error)
+	Enums(context.Context, queries.Executor, []int) ([]queries.Enum, error)
 }
 
 func NewParser(
@@ -49,15 +50,15 @@ func NewParser(
 // TODO вернуть ошибку если данные ссылаются на не указанную схему.
 func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, error) {
 	s := &schema.Schema{
-		Types:          make(map[string]*schema.DBType),
-		ArrayTypes:     make(map[string]*schema.ArrayType),
-		CompositeTypes: make(map[string]*schema.CompositeType),
-		EnumTypes:      make(map[string]*schema.EnumType),
-		RangeTypes:     make(map[string]*schema.RangeType),
-		DomainTypes:    make(map[string]*schema.DomainType),
-		Tables:         make(map[string]*schema.Table),
-		Constraints:    make(map[string]*schema.Constraint),
-		Indexes:        make(map[string]*schema.Index),
+		Types:          make(map[int]*schema.DBType),
+		ArrayTypes:     make(map[int]*schema.ArrayType),
+		CompositeTypes: make(map[int]*schema.CompositeType),
+		EnumTypes:      make(map[int]*schema.EnumType),
+		RangeTypes:     make(map[int]*schema.RangeType),
+		DomainTypes:    make(map[int]*schema.DomainType),
+		Tables:         make(map[int]*schema.Table),
+		Constraints:    make(map[int]*schema.Constraint),
+		Indexes:        make(map[int]*schema.Index),
 	}
 
 	patterns := make([]queries.TablesPattern, 0, len(conf.Patterns))
@@ -68,17 +69,20 @@ func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, e
 	if err := p.loadTables(ctx, s, patterns); err != nil {
 		return nil, fmt.Errorf("load tables: %w", err)
 	}
-	if err := p.loadTablesColumns(ctx, s); err != nil {
+	tableOIDs := mapKeys(s.Tables)
+	if err := p.loadTablesColumns(ctx, s, tableOIDs); err != nil {
 		return nil, fmt.Errorf("load tables columns: %w", err)
 	}
-	if err := p.loadConstraints(ctx, s); err != nil {
+	if err := p.loadConstraints(ctx, s, tableOIDs); err != nil {
 		return nil, fmt.Errorf("load constraints: %w", err)
 	}
-	if err := p.loadIndexes(ctx, s); err != nil {
+	if err := p.loadIndexes(ctx, s, tableOIDs); err != nil {
 		return nil, fmt.Errorf("load indexes: %w", err)
 	}
-
 	if err := p.loadTypes(ctx, s); err != nil {
+		return nil, fmt.Errorf("load types: %w", err)
+	}
+	if err := p.loadEnums(ctx, s); err != nil {
 		return nil, fmt.Errorf("load types: %w", err)
 	}
 	return s, nil
@@ -98,34 +102,34 @@ func (p *Parser) loadTables(
 	p.log.Debug("loaded tables", zap.Reflect("tables", tables))
 
 	// realloc
-	s.Tables = make(map[string]*schema.Table, len(tables))
-	s.TableNames = make([]string, 0, len(tables))
+	s.Tables = make(map[int]*schema.Table, len(tables))
 	for _, dbtable := range tables {
 		table := &schema.Table{
 			Name: schema.Identifier{
+				OID:    dbtable.OID,
 				Schema: dbtable.Schema,
 				Name:   dbtable.Table,
 			},
-			Columns:      make(map[string]*schema.Column),
-			Constraints:  make(map[string]*schema.Constraint),
-			ForeignKeys:  make(map[string]*schema.ForeignKey),
-			Indexes:      make(map[string]*schema.Index),
-			ReferencedBy: make(map[string]*schema.Constraint),
+			Columns:      make(map[int]*schema.Column),
+			Constraints:  make(map[int]*schema.Constraint),
+			ForeignKeys:  make(map[int]*schema.ForeignKey),
+			Indexes:      make(map[int]*schema.Index),
+			ReferencedBy: make(map[int]*schema.Constraint),
 		}
 
-		s.Tables[table.Name.String()] = table
-		s.TableNames = append(s.TableNames, table.Name.String())
-		if len(s.Tables) != len(s.TableNames) {
-			return fmt.Errorf("duplicated tables: %q", table.Name)
-		}
+		s.Tables[table.OID()] = table
 	}
 
 	return nil
 }
 
 // loadTablesColumns загружает колонки таблиц, включая типы и аттрибуты.
-func (p *Parser) loadTablesColumns(ctx context.Context, s *schema.Schema) error {
-	columns, err := p.q.Columns(ctx, p.conn, s.TableNames)
+func (p *Parser) loadTablesColumns(
+	ctx context.Context,
+	s *schema.Schema,
+	tableOIDs []int,
+) error {
+	columns, err := p.q.Columns(ctx, p.conn, tableOIDs)
 	if err != nil {
 		p.log.Error("failed to query tables columns", zap.Error(err))
 		return err
@@ -134,33 +138,25 @@ func (p *Parser) loadTablesColumns(ctx context.Context, s *schema.Schema) error 
 
 	for idx := range columns {
 		dbcolumn := &columns[idx]
-		tableName := schema.Identifier{
-			Schema: dbcolumn.SchemaName,
-			Name:   dbcolumn.TableName,
-		}
-		typeName := schema.Identifier{
-			Schema: dbcolumn.TypeSchema,
-			Name:   dbcolumn.TypeName,
-		}
-		table, ok := s.Tables[tableName.String()]
+		table, ok := s.Tables[dbcolumn.TableOID]
 		if !ok {
-			// TODO element not found error
-			return fmt.Errorf("table %q not found", tableName)
+			err := fmt.Errorf("table with oid %d not found", dbcolumn.TableOID)
+			p.log.Error("failed to get table for column", zap.Error(err))
+			return err
 		}
 
-		typ, ok := s.Types[typeName.String()]
+		typ, ok := s.Types[dbcolumn.TypeOID]
 		if !ok {
-			typ = &schema.DBType{
-				TypeName: typeName,
-			}
-			p.log.Debug("add type", zap.Stringer("type", typ.TypeName))
-			s.Types[typeName.String()] = typ
+			typ = &schema.DBType{}
+			p.log.Debug("add type", zap.Int("type", typ.OID()))
+			s.Types[dbcolumn.TypeOID] = typ
 		}
 
 		column := &schema.Column{
-			Name:  dbcolumn.ColumnName,
-			Table: table,
-			Type:  typ,
+			ColNum: dbcolumn.ColumnNum,
+			Name:   dbcolumn.ColumnName,
+			Table:  table,
+			Type:   typ,
 			Attributes: schema.ColumnAttributes{
 				HasDefault:  dbcolumn.HasDefault,
 				IsGenerated: dbcolumn.IsGenerated,
@@ -177,11 +173,7 @@ func (p *Parser) loadTablesColumns(ctx context.Context, s *schema.Schema) error 
 			},
 		}
 
-		table.Columns[column.Name] = column
-		table.ColumnNames = append(table.ColumnNames, column.Name)
-		if len(table.Columns) != len(table.ColumnNames) {
-			return fmt.Errorf("duplicated columns")
-		}
+		table.Columns[column.ColNum] = column
 	}
 
 	return nil
@@ -198,8 +190,12 @@ var pgConstraintType = map[string]schema.ConstraintType{
 }
 
 // loadConstraints загружает ограничения для всех найденных таблиц.
-func (p *Parser) loadConstraints(ctx context.Context, s *schema.Schema) error {
-	constraints, err := p.q.Constraints(ctx, p.conn, s.TableNames)
+func (p *Parser) loadConstraints(
+	ctx context.Context,
+	s *schema.Schema,
+	tableOIDs []int,
+) error {
+	constraints, err := p.q.Constraints(ctx, p.conn, tableOIDs)
 	if err != nil {
 		p.log.Error("failed to query tables constraints", zap.Error(err))
 		return err
@@ -207,7 +203,7 @@ func (p *Parser) loadConstraints(ctx context.Context, s *schema.Schema) error {
 	p.log.Debug("loaded constraints", zap.Int("n", len(constraints)))
 
 	// realloc
-	s.Constraints = make(map[string]*schema.Constraint, len(constraints))
+	s.Constraints = make(map[int]*schema.Constraint, len(constraints))
 	for idx := range constraints {
 		if err := p.makeConstraint(s, &constraints[idx]); err != nil {
 			return err
@@ -227,20 +223,14 @@ func (p *Parser) makeConstraint(
 		Name:   dbconstraint.ConstraintName,
 	}
 
-	_, ok := s.Constraints[constraintName.String()]
+	_, ok := s.Constraints[constraintName.OID]
 	if ok {
 		return fmt.Errorf("duplicate constraint %q", constraintName)
 	}
 
-	tableName := schema.Identifier{
-		OID:    dbconstraint.TableOID,
-		Schema: dbconstraint.SchemaName,
-		Name:   dbconstraint.TableName,
-	}
-
-	table, ok := s.Tables[tableName.String()]
+	table, ok := s.Tables[dbconstraint.TableOID]
 	if !ok {
-		return fmt.Errorf("unable to find table %q", tableName)
+		return fmt.Errorf("unable to find table with oid %d", dbconstraint.TableOID)
 	}
 	typ, ok := pgConstraintType[dbconstraint.ConstraintType]
 	if !ok {
@@ -254,14 +244,14 @@ func (p *Parser) makeConstraint(
 		Definition: dbconstraint.ConstraintDef,
 	}
 
-	cols, err := p.checkTableColumns(dbconstraint.Columns, table)
+	cols, err := p.checkTableColumns(dbconstraint.Colnums, table)
 	if err != nil {
 		return fmt.Errorf("check table columns for constraint %q: %w", c.Name, err)
 	}
 	c.Columns = cols
 
-	s.Constraints[constraintName.String()] = c
-	table.Constraints[c.Name.String()] = c
+	s.Constraints[constraintName.OID] = c
+	table.Constraints[c.OID()] = c
 
 	switch c.Type {
 	case schema.ConstraintTypePK:
@@ -274,24 +264,24 @@ func (p *Parser) makeConstraint(
 			return err
 		}
 
-		table.ForeignKeys[c.Name.String()] = fk
+		table.ForeignKeys[c.OID()] = fk
 	}
 
 	return nil
 }
 
 func (p *Parser) checkTableColumns(
-	columns []string,
+	colnums []int,
 	table *schema.Table,
-) (map[string]*schema.Column, error) {
-	cols := make(map[string]*schema.Column, len(columns))
-	for _, column := range columns {
-		tcol, ok := table.Columns[column]
+) (map[int]*schema.Column, error) {
+	cols := make(map[int]*schema.Column, len(colnums))
+	for _, colnum := range colnums {
+		tcol, ok := table.Columns[colnum]
 		if !ok {
-			return nil, fmt.Errorf("column %q not found in table %q", column, table.Name)
+			return nil, fmt.Errorf("column %d not found in table %q", colnum, table)
 		}
 
-		cols[column] = tcol
+		cols[colnum] = tcol
 	}
 	return cols, nil
 }
@@ -301,32 +291,20 @@ func (p *Parser) makeForeignConstraint(
 	c *schema.Constraint,
 	dbconstraint *queries.Constraint,
 ) (*schema.ForeignKey, error) {
-	foreignTableName := schema.Identifier{
-		OID:    int(dbconstraint.ForeignTableOID.Int32),
-		Schema: dbconstraint.ForeignSchemaName.String,
-		Name:   dbconstraint.ForeignTableName.String,
-	}
-	ftable, ok := s.Tables[foreignTableName.String()]
+	fkoid := int(dbconstraint.ForeignTableOID.Int32)
+	ftable, ok := s.Tables[fkoid]
 	if !ok {
-		return nil, fmt.Errorf("foreign table %q not found for constraint %q", foreignTableName, c.Name)
+		return nil, fmt.Errorf("foreign table with oid %d not found for constraint %q", fkoid, c.Name)
 	}
-	ftable.ReferencedBy[c.Name.String()] = c
+	ftable.ReferencedBy[c.OID()] = c
 
 	fk := &schema.ForeignKey{
 		Foreign:          c,
 		Reference:        ftable,
-		ReferenceColumns: make(map[string]*schema.Column, len(dbconstraint.ForeignColumns)),
+		ReferenceColumns: make(map[int]*schema.Column, len(dbconstraint.ForeignColnums)),
 	}
 
-	columns := make([]string, 0, len(dbconstraint.ForeignColumns))
-	for _, column := range dbconstraint.ForeignColumns {
-		if !column.Valid {
-			return nil, fmt.Errorf("null foreign column for constraint %q", c.Name)
-		}
-		columns = append(columns, column.String)
-	}
-
-	cols, err := p.checkTableColumns(columns, ftable)
+	cols, err := p.checkTableColumns(dbconstraint.ForeignColnums, ftable)
 	if err != nil {
 		return nil, fmt.Errorf("check foreign table columns for constraint %q: %w", c.Name, err)
 	}
@@ -335,8 +313,12 @@ func (p *Parser) makeForeignConstraint(
 	return fk, nil
 }
 
-func (p *Parser) loadIndexes(ctx context.Context, s *schema.Schema) error {
-	indexes, err := p.q.Indexes(ctx, p.conn, s.TableNames, mapKeys(s.Constraints))
+func (p *Parser) loadIndexes(
+	ctx context.Context,
+	s *schema.Schema,
+	tableOIDs []int,
+) error {
+	indexes, err := p.q.Indexes(ctx, p.conn, tableOIDs, mapKeys(s.Constraints))
 	if err != nil {
 		p.log.Error("failed to query tables indexes", zap.Error(err))
 		return err
@@ -344,7 +326,7 @@ func (p *Parser) loadIndexes(ctx context.Context, s *schema.Schema) error {
 	p.log.Debug("loaded indexes", zap.Int("n", len(indexes)))
 
 	// realloc
-	s.Indexes = make(map[string]*schema.Index, len(indexes))
+	s.Indexes = make(map[int]*schema.Index, len(indexes))
 	for idx := range indexes {
 		if err := p.makeIndex(s, &indexes[idx]); err != nil {
 			return err
@@ -359,17 +341,12 @@ func (p *Parser) makeIndex(s *schema.Schema, dbindex *queries.Index) error {
 		Schema: dbindex.IndexSchema,
 		Name:   dbindex.IndexName,
 	}
-	tableName := schema.Identifier{
-		OID:    dbindex.TableOID,
-		Schema: dbindex.TableSchema,
-		Name:   dbindex.TableName,
-	}
 
-	table, ok := s.Tables[tableName.String()]
+	table, ok := s.Tables[dbindex.TableOID]
 	if !ok {
-		return fmt.Errorf("table %q not found for index %q", tableName, indexName)
+		return fmt.Errorf("table with oid %d not found for index %q", dbindex.TableOID, indexName)
 	}
-	index, ok := s.Indexes[indexName.String()]
+	index, ok := s.Indexes[indexName.OID]
 	if !ok {
 		index = &schema.Index{
 			Name:       indexName,
@@ -385,30 +362,13 @@ func (p *Parser) makeIndex(s *schema.Schema, dbindex *queries.Index) error {
 			return fmt.Errorf("check table columns for index %q: %w", indexName, err)
 		}
 		index.Columns = columns
-		s.Indexes[indexName.String()] = index
-		table.Indexes[indexName.String()] = index
+		s.Indexes[indexName.OID] = index
+		table.Indexes[indexName.OID] = index
 	}
 
-	constraintName := schema.Identifier{
-		OID:    int(dbindex.ConstraintOID.Int32),
-		Schema: dbindex.ConstraintSchema.String,
-		Name:   dbindex.ConstraintName.String,
-	}
-	var constraint *schema.Constraint
 	if dbindex.ConstraintOID.Valid {
-		constraint, ok = s.Constraints[constraintName.String()]
-		if !ok {
-			return fmt.Errorf("constraint %q not found fot index %q for table %q",
-				constraintName,
-				indexName,
-				tableName,
-			)
-		}
+		s.Constraints[int(dbindex.ConstraintOID.Int32)].Index = index
 	}
-	if constraint != nil {
-		constraint.Index = index
-	}
-
 	return nil
 }
 
@@ -429,27 +389,30 @@ func (p *Parser) loadTypes(ctx context.Context, s *schema.Schema) error {
 func (p *Parser) loadTypesByNames(
 	ctx context.Context,
 	s *schema.Schema,
-	typeNames []string,
-) (moreTypes []string, err error) {
+	typeNames []int,
+) (moreTypes []int, err error) {
 	types, err := p.q.Types(ctx, p.conn, typeNames)
 	if err != nil {
 		return nil, err
 	}
 	p.log.Debug("types loaded",
-		zap.Strings("type_names", typeNames),
+		zap.Ints("type_names", typeNames),
 	)
 
 	for idx := range types {
 		dbtype := &types[idx]
 		typeName := schema.Identifier{
-			Schema: dbtype.SchemaName,
+			OID:    dbtype.TypeOID,
+			Schema: dbtype.TypeSchema,
 			Name:   dbtype.TypeName,
 		}
 
-		typ, ok := s.Types[typeName.String()]
+		typ, ok := s.Types[typeName.OID]
 		if !ok {
-			return nil, fmt.Errorf("internal error, type %q not found", typeName)
+			p.log.Error("internal error, type not found", zap.Int("oid", typeName.OID))
+			return nil, fmt.Errorf("type %d not found", typeName.OID)
 		}
+		typ.TypeName = typeName
 
 		typType, ok := pgTypType[dbtype.TypeType]
 		if !ok {
@@ -490,7 +453,7 @@ func (p *Parser) fillType(
 	s *schema.Schema,
 	typ *schema.DBType,
 	dbtype *queries.Type,
-) (moreTypes []string, err error) {
+) (moreTypes []int, err error) {
 	switch typ.Type {
 	default:
 		return nil, fmt.Errorf("data type is undefined: %s", typ.Type)
@@ -498,176 +461,76 @@ func (p *Parser) fillType(
 	case schema.DataTypeMultiRange:
 	case schema.DataTypePseudo:
 	case schema.DataTypeDomain:
-		moreTypes, typ.DomainType, err = p.makeDomainType(s, typ.TypeName, dbtype)
+		typ.DomainType = &schema.DomainType{
+			Attributes: schema.DomainAttributes{
+				NotNullable:      !dbtype.DomainIsNotNullable,
+				HasCharMaxLength: dbtype.DomainCharacterMaxSize.Valid,
+				CharMaxLength:    int(dbtype.DomainCharacterMaxSize.Int32),
+				ArrayDims:        dbtype.DomainArrayDims,
+				IsNumeric:        dbtype.DomainIsNumeric,
+				NumericPrecision: int(dbtype.DomainNumericPrecision.Int32),
+				NumericScale:     int(dbtype.DomainNumericScale.Int32),
+			},
+		}
+		moreTypes = fillElemType(s.Types, s.DomainTypes, typ.DomainType, int(dbtype.DomainTypeOID.Int32))
 	case schema.DataTypeArray:
-		moreTypes, typ.ArrayType, err = p.makeArrayType(s, typ.TypeName, dbtype)
+		typ.ArrayType = &schema.ArrayType{}
+		moreTypes = fillElemType(s.Types, s.ArrayTypes, typ.ArrayType, int(dbtype.ElemTypeOID.Int32))
 	case schema.DataTypeEnum:
-		typ.EnumType, err = p.makeEnumType(s, typ.TypeName, dbtype)
+		typ.EnumType = &schema.EnumType{}
+		s.EnumTypes[typ.OID()] = typ.EnumType
 	case schema.DataTypeRange:
-		moreTypes, typ.RangeType, err = p.makeRangeType(s, typ.TypeName, dbtype)
+		typ.RangeType = &schema.RangeType{}
+		moreTypes = fillElemType(s.Types, s.RangeTypes, typ.RangeType, int(dbtype.RangeElementTypeOID.Int32))
 	case schema.DataTypeComposite:
-		typ.CompositeType, err = p.makeCompositeType(s, typ.TypeName)
+		typ.CompositeType = &schema.CompositeType{}
+		s.CompositeTypes[typ.OID()] = typ.CompositeType
 	}
 	return moreTypes, err
 }
 
-func (p *Parser) makeDomainType(
-	s *schema.Schema,
-	domainTypeName schema.Identifier,
-	dbtype *queries.Type,
-) (needLoad []string, domain *schema.DomainType, err error) {
-	domain, ok := s.DomainTypes[domainTypeName.String()]
-	if ok {
-		return nil, nil, fmt.Errorf("duplicate domain type: %q", domainTypeName)
-	}
-	defer func() {
-		s.DomainTypes[domainTypeName.String()] = domain
-	}()
+func (p *Parser) loadEnums(ctx context.Context, s *schema.Schema) error {
+	enumOIDs := mapKeys(s.EnumTypes)
 
-	// Тип элемента, на котором основан домен
-	elemTypeName := schema.Identifier{
-		Schema: dbtype.DomainSchema.String,
-		Name:   dbtype.DomainType.String,
+	enums, err := p.q.Enums(ctx, p.conn, enumOIDs)
+	if err != nil {
+		return fmt.Errorf("error loading enums: %w", err)
 	}
-	elemType, ok := s.Types[elemTypeName.String()]
-	if !ok {
-		elemType = &schema.DBType{
-			TypeName: elemTypeName,
+
+	for _, dbenum := range enums {
+		enum, ok := s.EnumTypes[dbenum.TypeOID]
+		if !ok {
+			return fmt.Errorf("enum with oid %q not found", dbenum.TypeOID)
 		}
-		s.Types[elemTypeName.String()] = elemType
-		needLoad = append(needLoad, elemTypeName.String())
+		enum.Values = dbenum.Values
 	}
 
-	domain = &schema.DomainType{
-		TypeName: domainTypeName,
-		Attributes: schema.DomainAttributes{
-			NotNullable:      !dbtype.DomainIsNotNullable,
-			HasCharMaxLength: dbtype.DomainCharacterMaxSize.Valid,
-			CharMaxLength:    int(dbtype.DomainCharacterMaxSize.Int32),
-			ArrayDims:        dbtype.DomainArrayDims,
-			IsNumeric:        dbtype.DomainIsNumeric,
-			NumericPrecision: int(dbtype.DomainNumericPrecision.Int32),
-			NumericScale:     int(dbtype.DomainNumericScale.Int32),
-		},
-		ElemType: elemType,
-	}
-
-	return needLoad, domain, nil
+	return nil
 }
 
-//nolint:dupl // fp
-func (p *Parser) makeArrayType(
-	s *schema.Schema,
-	arrayTypeName schema.Identifier,
-	dbtype *queries.Type,
-) (needLoad []string, array *schema.ArrayType, err error) {
-	array, ok := s.ArrayTypes[arrayTypeName.String()]
-	if ok {
-		return nil, nil, fmt.Errorf("duplicate domain type: %q", arrayTypeName)
-	}
-	defer func() {
-		s.ArrayTypes[arrayTypeName.String()] = array
-	}()
-
-	// Тип элемента массива
-	elemTypeName := schema.Identifier{
-		Schema: dbtype.ElemTypeSchema.String,
-		Name:   dbtype.ElemTypeName.String,
-	}
-	elemType, ok := s.Types[elemTypeName.String()]
+func fillElemType[T schema.Elementer](
+	types map[int]*schema.DBType,
+	elemMap map[int]T,
+	base T,
+	elemTypeOID int,
+) (needLoad []int) {
+	// Тип элемента, на котором основан тип
+	elem, ok := types[elemTypeOID]
 	if !ok {
-		elemType = &schema.DBType{
-			TypeName: elemTypeName,
-		}
-		s.Types[elemTypeName.String()] = elemType
-		needLoad = append(needLoad, elemTypeName.String())
+		elem = &schema.DBType{}
+		types[elemTypeOID] = elem
+		needLoad = append(needLoad, elemTypeOID)
 	}
-
-	array = &schema.ArrayType{
-		TypeName: arrayTypeName,
-		ElemType: elemType,
-	}
-
-	return needLoad, array, nil
+	base.SetElemType(elem)
+	elemMap[base.OID()] = base
+	return needLoad
 }
 
-func (p *Parser) makeEnumType(
-	s *schema.Schema,
-	enumTypeName schema.Identifier,
-	dbtype *queries.Type,
-) (enum *schema.EnumType, err error) {
-	enum, ok := s.EnumTypes[enumTypeName.String()]
-	if ok {
-		return nil, fmt.Errorf("duplicate domain type: %q", enumTypeName)
-	}
-	defer func() {
-		s.EnumTypes[enumTypeName.String()] = enum
-	}()
-
-	return &schema.EnumType{
-		TypeName: enumTypeName,
-		Values:   dbtype.EnumValues,
-	}, nil
-}
-
-//nolint:dupl // fp
-func (p *Parser) makeRangeType(
-	s *schema.Schema,
-	rangeTypeName schema.Identifier,
-	dbtype *queries.Type,
-) (needLoad []string, rng *schema.RangeType, err error) {
-	rng, ok := s.RangeTypes[rangeTypeName.String()]
-	if ok {
-		return nil, nil, fmt.Errorf("duplicate domain type: %q", rangeTypeName)
-	}
-	defer func() {
-		s.RangeTypes[rangeTypeName.String()] = rng
-	}()
-
-	elemTypeName := schema.Identifier{
-		Schema: dbtype.RangeElementTypeSchema.String,
-		Name:   dbtype.RangeElementTypeName.String,
-	}
-	elemType, ok := s.Types[elemTypeName.String()]
-	if !ok {
-		elemType = &schema.DBType{
-			TypeName: elemTypeName,
-		}
-		s.Types[elemTypeName.String()] = elemType
-		needLoad = append(needLoad, elemTypeName.String())
-	}
-
-	rng = &schema.RangeType{
-		TypeName: rangeTypeName,
-		ElemType: elemType,
-	}
-
-	return needLoad, rng, nil
-}
-
-func (p *Parser) makeCompositeType(
-	s *schema.Schema,
-	compositeTypeName schema.Identifier,
-) (composite *schema.CompositeType, err error) {
-	composite, ok := s.CompositeTypes[compositeTypeName.String()]
-	if ok {
-		return nil, fmt.Errorf("duplicate domain type: %q", compositeTypeName)
-	}
-	defer func() {
-		s.CompositeTypes[compositeTypeName.String()] = composite
-	}()
-
-	return &schema.CompositeType{
-		TypeName: compositeTypeName,
-		// Attributes: make(map[string]*schema.CompositeAttribute),
-	}, nil
-}
-
-func mapKeys[V any](m map[string]V) (keys []string) {
-	keys = make([]string, 0, len(m))
+func mapKeys[K ~string | ~int, V any](m map[K]V) (keys []K) {
+	keys = make([]K, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 	return keys
 }

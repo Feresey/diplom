@@ -1,11 +1,10 @@
 SELECT
 	-- column
-	ns_table.nspname AS schema_name,
-	pc_table.relname AS table_name,
-	a.attname        AS column_name,
+	a.attrelid::INT AS table_oid,
+	a.attnum        AS column_num,
+	a.attname       AS column_name,
 	-- type
-	ns_type.nspname  AS type_schema,
-	t.typname        AS type_name,
+	t.oid::INT AS type_oid,
 	-- attributes
 	a.attnotnull     AS is_nullable,
 	a.atthasdef      AS has_default,
@@ -45,15 +44,13 @@ SELECT
 	)::INT AS numeric_scale
 FROM
 	pg_attribute a
-	JOIN pg_class pc_table ON a.attrelid = pc_table.oid
-	JOIN pg_namespace ns_table ON pc_table.relnamespace = ns_table.oid
 	JOIN pg_type t ON a.atttypid = t.oid
-	JOIN pg_namespace ns_type ON t.typnamespace = ns_type.oid
-	LEFT JOIN pg_type elem_t ON elem_t.oid = t.typelem
 	LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
+	LEFT JOIN pg_type elem_t ON elem_t.oid = t.typelem
 WHERE
 	attnum > 0
 	AND attisdropped = False
-	AND ns_table.nspname || '.' || pc_table.relname = ANY($1)
+	AND a.attrelid = ANY($1)
 ORDER BY
+	a.attrelid,
 	a.attnum;

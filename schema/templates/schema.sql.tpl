@@ -1,21 +1,20 @@
 {{- /* range tables */}}
-{{- range .TableNames }}
-{{- $table := index $.Tables .}}
+{{- range $table := $.Tables }}
 CREATE TABLE {{$table.Name}} (
 {{- /* range columns */}}
-{{- $maxlen := 0}}{{range $table.ColumnNames}}{{if gt (len .) $maxlen}}{{$maxlen = len .}}{{end}}{{end}}
-{{- range $table.ColumnNames }}{{$column := index $table.Columns .}}
+{{- $maxlen := 0}}{{range $table.Columns}}{{$curlen := len .Name}}{{if gt $curlen $maxlen}}{{$maxlen = $curlen}}{{end}}{{end}}
+{{- range $column := $table.Columns }}
     {{$column.Name}} {{space (len $column.Name) $maxlen}}{{" "}}
     {{- template "coltype" $column}}
     {{- /* range foreign keys */}}
     {{- range $fk_id, $fk := $table.ForeignKeys}}
-        {{- with index $fk.Foreign.Columns $column.Name}}
+        {{- with index $fk.Foreign.Columns $column.ColNum}}
             {{- ""}} CONSTRAINT {{ $fk.Foreign.Name}} REFERENCES {{$fk.Reference.Name}}({{$fk.ReferenceColumns | columnNames}})
         {{- end}}
     {{- /* range foreign keys */}}
     {{- end}}
     {{- /* with primary key */}}
-    {{- with $table.PrimaryKey}}{{with index .Columns $column.Name}}
+    {{- with $table.PrimaryKey}}{{with index .Columns $column.ColNum}}
         {{- ""}} PRIMARY KEY
     {{- /* with primary key */}}
     {{- end}}{{end}}

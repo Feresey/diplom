@@ -19,18 +19,16 @@ func (i Identifier) String() string { return i.Schema + "." + i.Name }
 
 // Schema отражает схему, расположенную в базе данных.
 type Schema struct {
-	Types          map[string]*DBType        `json:"types,omitempty"`
-	ArrayTypes     map[string]*ArrayType     `json:"array_types,omitempty"`
-	CompositeTypes map[string]*CompositeType `json:"composite_types,omitempty"`
-	EnumTypes      map[string]*EnumType      `json:"enum_types,omitempty"`
-	RangeTypes     map[string]*RangeType     `json:"range_types,omitempty"`
-	DomainTypes    map[string]*DomainType    `json:"domain_types,omitempty"`
+	Types          map[int]*DBType        `json:"types,omitempty"`
+	ArrayTypes     map[int]*ArrayType     `json:"array_types,omitempty"`
+	CompositeTypes map[int]*CompositeType `json:"composite_types,omitempty"`
+	EnumTypes      map[int]*EnumType      `json:"enum_types,omitempty"`
+	RangeTypes     map[int]*RangeType     `json:"range_types,omitempty"`
+	DomainTypes    map[int]*DomainType    `json:"domain_types,omitempty"`
 
-	Tables      map[string]*Table      `json:"tables,omitempty"`
-	Constraints map[string]*Constraint `json:"constraints,omitempty"`
-	Indexes     map[string]*Index      `json:"indexes,omitempty"`
-	// имена том же порядке что и в базе
-	TableNames []string `json:"table_names,omitempty"`
+	Tables      map[int]*Table      `json:"tables,omitempty"`
+	Constraints map[int]*Constraint `json:"constraints,omitempty"`
+	Indexes     map[int]*Index      `json:"indexes,omitempty"`
 }
 
 // Table описывает таблицу базы данных.
@@ -38,24 +36,23 @@ type Table struct {
 	// имя таблицы
 	Name Identifier `json:"name,omitempty"`
 	// мапа колонок, где ключ - имя колонки хранить имена как
-	Columns map[string]*Column `json:"columns,omitempty"`
-	// имена колонок в том же порядке что и в базе
-	ColumnNames []string `json:"column_names,omitempty"`
+	Columns map[int]*Column `json:"columns,omitempty"`
 
 	// Главный ключ таблицы (может быть nil)
 	PrimaryKey *Constraint `json:"primary_key,omitempty"`
 	// Внешние ключи таблицы, ключ мапы - FK Name
-	ForeignKeys map[string]*ForeignKey `json:"foreign_keys,omitempty"`
-	// Ключи, которые ссылаются на эту таблицу, ключ мапы - UNIQUE CONSTRAINT
-	ReferencedBy map[string]*Constraint `json:"referenced_by,omitempty"`
+	ForeignKeys map[int]*ForeignKey `json:"foreign_keys,omitempty"`
+	// Ключи, которые ссылаются на эту таблицу
+	ReferencedBy map[int]*Constraint `json:"referenced_by,omitempty"`
 
 	// Список всех CONSTRAINT-ов текущей таблицы
-	Constraints map[string]*Constraint `json:"constraints,omitempty"`
+	Constraints map[int]*Constraint `json:"constraints,omitempty"`
 	// Список всех INDEX-ов текущей таблицы
-	Indexes map[string]*Index `json:"indexes,omitempty"`
+	Indexes map[int]*Index `json:"indexes,omitempty"`
 }
 
 func (t *Table) String() string { return t.Name.String() }
+func (t *Table) OID() int       { return t.Name.OID }
 
 // ForeignKey описывает внешнюю связь
 // В PostgreSQL FK может ссылаться на PRIMARY KEY CONSTRAINT, UNIQUE CONSTRAINT, UNIQUE INDEX.
@@ -66,13 +63,15 @@ type ForeignKey struct {
 	// Таблица, на которую ссылаются
 	Reference *Table `json:"reference,omitempty"`
 	// Список колонок во внешней таблице, на которые ссылается FOREIGN KEY
-	ReferenceColumns map[string]*Column `json:"reference_columns,omitempty"`
+	ReferenceColumns map[int]*Column `json:"reference_columns,omitempty"`
 }
 
 func (f *ForeignKey) String() string { return f.Foreign.String() }
 
 // Column описывает колонку таблицы.
 type Column struct {
+	// Порядковый номер колонки
+	ColNum int `json:"col_num,omitempty"`
 	// Имя колонки
 	Name string `json:"name,omitempty"`
 	// Таблица, которой принадлежит колонка
@@ -114,6 +113,7 @@ type DBType struct {
 }
 
 func (d *DBType) String() string { return d.TypeName.String() }
+func (d *DBType) OID() int       { return d.TypeName.OID }
 
 type ArrayType struct {
 	TypeName Identifier `json:"type_name,omitempty"`
@@ -122,6 +122,7 @@ type ArrayType struct {
 }
 
 func (a *ArrayType) String() string { return a.TypeName.String() }
+func (a *ArrayType) OID() int       { return a.TypeName.OID }
 
 func (a *ArrayType) GetElemType() *DBType     { return a.ElemType }
 func (a *ArrayType) SetElemType(elem *DBType) { a.ElemType = elem }
@@ -132,6 +133,7 @@ type EnumType struct {
 }
 
 func (e *EnumType) String() string { return e.TypeName.String() }
+func (e *EnumType) OID() int       { return e.TypeName.OID }
 
 type CompositeType struct {
 	TypeName Identifier `json:"type_name,omitempty"`
@@ -139,6 +141,7 @@ type CompositeType struct {
 }
 
 func (c *CompositeType) String() string { return c.TypeName.String() }
+func (c *CompositeType) OID() int       { return c.TypeName.OID }
 
 // type CompositeAttribute struct {
 // 	// Имя аттрибута
@@ -156,6 +159,7 @@ type DomainType struct {
 }
 
 func (d *DomainType) String() string           { return d.TypeName.String() }
+func (d *DomainType) OID() int                 { return d.TypeName.OID }
 func (d *DomainType) GetElemType() *DBType     { return d.ElemType }
 func (d *DomainType) SetElemType(elem *DBType) { d.ElemType = elem }
 
@@ -165,6 +169,7 @@ type RangeType struct {
 }
 
 func (r *RangeType) String() string           { return r.TypeName.String() }
+func (r *RangeType) OID() int                 { return r.TypeName.OID }
 func (r *RangeType) GetElemType() *DBType     { return r.ElemType }
 func (r *RangeType) SetElemType(elem *DBType) { r.ElemType = elem }
 
@@ -222,10 +227,13 @@ type Constraint struct {
 	// Колонки всегда принадлежат той же таблице, которой принадлежит ограничение
 	// Количество колонок всегда >= 1
 	// Ключ мапы - имя колонки
-	Columns map[string]*Column `json:"columns,omitempty"`
+	Columns map[int]*Column `json:"columns,omitempty"`
 }
 
-func (c *Constraint) String() string { return c.Name.String() }
+func (c *Constraint) String() string {
+	return fmt.Sprintf("%s.%s.%s", c.Name.Schema, c.Table, c.Name.Name)
+}
+func (c *Constraint) OID() int { return c.Name.OID }
 
 type Index struct {
 	// Имя индекса
@@ -233,7 +241,7 @@ type Index struct {
 	// Таблица, для которой создан индекс
 	Table *Table `json:"-"`
 	// Колонки, которые затрагивает индекс
-	Columns map[string]*Column `json:"columns,omitempty"`
+	Columns map[int]*Column `json:"columns,omitempty"`
 	// Определение индекса
 	Definition string `json:"definition,omitempty"`
 
@@ -243,10 +251,13 @@ type Index struct {
 	IsNullsNotDistinct bool `json:"is_nulls_not_distinct,omitempty"`
 }
 
-func (i *Index) String() string { return i.Name.String() }
+func (i *Index) String() string {
+	return fmt.Sprintf("%s.%s.%s", i.Name.Schema, i.Table, i.Name.Name)
+}
+func (i *Index) OID() int { return i.Name.OID }
 
-func getValueFormat[T fmt.Stringer](
-	m map[string]T, key string,
+func getValueFormat[K comparable, T fmt.Stringer](
+	m map[K]T, key K,
 	msg string, args ...any,
 ) (T, error) {
 	value, ok := m[key]
@@ -256,25 +267,27 @@ func getValueFormat[T fmt.Stringer](
 	return value, nil
 }
 
-func getElemType[T fmt.Stringer](
-	basename, basetype string,
-	typename string,
-	m map[string]T,
+func getElemType[K int, T fmt.Stringer](
+	basename string,
+	m map[K]T,
+	typename K,
+	basetype T,
 ) (T, error) {
 	return getValueFormat(m, typename,
-		"%s type %q not found for type %s", basename, typename, basetype)
+		"%s type with oid %d not found for type %s", basename, typename, basetype)
 }
 
-func fillElemType[T interface {
+type Elementer interface {
 	fmt.Stringer
+	OID() int
 	GetElemType() *DBType
 	SetElemType(elem *DBType)
-}](
-	m map[string]*DBType, base T,
-) error {
+}
+
+func fillElemType[T Elementer](m map[int]*DBType, base T) error {
 	if elem := base.GetElemType(); elem != nil {
-		typ, err := getValueFormat(m, elem.String(),
-			"elem type %q not found for type %q", elem, base)
+		typ, err := getValueFormat(m, elem.OID(),
+			"elem type with oid %d not found for type %q", elem.OID(), base)
 		if err != nil {
 			return err
 		}
@@ -307,25 +320,34 @@ func (s *Schema) fillTypes() error {
 		var err error
 		switch {
 		case typ.ArrayType != nil:
-			typ.ArrayType, err = getElemType(
-				"array", typ.String(),
-				typ.ArrayType.String(), s.ArrayTypes)
+			typ.ArrayType, err = getElemType("array",
+				s.ArrayTypes, typ.OID(),
+				typ.ArrayType,
+			)
 		case typ.CompositeType != nil:
-			typ.CompositeType, err = getElemType(
-				"composite", typ.String(),
-				typ.CompositeType.String(), s.CompositeTypes)
+			typ.CompositeType, err = getElemType("composite",
+				s.CompositeTypes,
+				typ.OID(),
+				typ.CompositeType,
+			)
 		case typ.DomainType != nil:
-			typ.DomainType, err = getElemType(
-				"domain", typ.String(),
-				typ.DomainType.String(), s.DomainTypes)
+			typ.DomainType, err = getElemType("domain",
+				s.DomainTypes,
+				typ.OID(),
+				typ.DomainType,
+			)
 		case typ.EnumType != nil:
-			typ.EnumType, err = getElemType(
-				"enum", typ.String(),
-				typ.EnumType.String(), s.EnumTypes)
+			typ.EnumType, err = getElemType("enum",
+				s.EnumTypes,
+				typ.OID(),
+				typ.EnumType,
+			)
 		case typ.RangeType != nil:
-			typ.RangeType, err = getElemType(
-				"range", typ.String(),
-				typ.RangeType.String(), s.RangeTypes)
+			typ.RangeType, err = getElemType("range",
+				s.RangeTypes,
+				typ.OID(),
+				typ.RangeType,
+			)
 		}
 		if err != nil {
 			return err
@@ -335,7 +357,7 @@ func (s *Schema) fillTypes() error {
 	return nil
 }
 
-func fillColumns(dst, src map[string]*Column, msg string, args ...any) error {
+func fillColumns(dst, src map[int]*Column, msg string, args ...any) error {
 	for colName := range dst {
 		col, err := getValueFormat(src, colName,
 			"column %q not found for"+msg, append([]any{colName}, args...)...)
@@ -352,7 +374,7 @@ func (s *Schema) fillIndexes() error {
 		if index.Table == nil {
 			return fmt.Errorf("table not specified for index %q", index)
 		}
-		table, err := getValueFormat(s.Tables, index.Table.String(),
+		table, err := getValueFormat(s.Tables, index.Table.OID(),
 			"table %q not found for index %q", index.Table, index)
 		if err != nil {
 			return err
@@ -373,7 +395,7 @@ func (s *Schema) fillConstraints() error {
 		if constraint.Table == nil {
 			return fmt.Errorf("table not specified for constraint %q", constraint)
 		}
-		table, err := getValueFormat(s.Tables, constraint.Table.String(),
+		table, err := getValueFormat(s.Tables, constraint.Table.OID(),
 			"table %q not found for constraint %q", constraint.Table, constraint)
 		if err != nil {
 			return err
@@ -387,7 +409,7 @@ func (s *Schema) fillConstraints() error {
 		}
 
 		if constraint.Index != nil {
-			index, err := getValueFormat(s.Indexes, constraint.Index.String(),
+			index, err := getValueFormat(s.Indexes, constraint.Index.OID(),
 				"index %q not found for constraint %q", constraint.Index, constraint)
 			if err != nil {
 				return err
@@ -401,7 +423,7 @@ func (s *Schema) fillConstraints() error {
 func (s *Schema) fillTableColumns(table *Table) error {
 	for colname, col := range table.Columns {
 		col.Table = table
-		typ, err := getValueFormat(s.Types, col.Type.String(),
+		typ, err := getValueFormat(s.Types, col.Type.OID(),
 			"type %q not found for column %q in table %q ",
 			col.Type, colname, table)
 		if err != nil {
@@ -446,7 +468,7 @@ func (s *Schema) fillTableFk(table *Table) error {
 			return err
 		}
 		fk.Foreign = fkey
-		ref, err := getValueFormat(s.Tables, fk.Reference.String(),
+		ref, err := getValueFormat(s.Tables, fk.Reference.OID(),
 			"table %q not found for fk %q for table %q",
 			fk.Reference, fkname, table)
 		if err != nil {
@@ -496,7 +518,7 @@ func (s *Schema) fillTable(table *Table) error {
 	if table.PrimaryKey == nil {
 		return nil
 	}
-	pk, err := getValueFormat(s.Constraints, table.PrimaryKey.String(),
+	pk, err := getValueFormat(s.Constraints, table.PrimaryKey.OID(),
 		"primary key %q not found for table %q",
 		table.PrimaryKey, table)
 	if err != nil {

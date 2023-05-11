@@ -87,13 +87,10 @@ WHERE
 var queryColumnsSQL string
 
 type Column struct {
-	SchemaName string
-	TableName  string
-	ColumnName string
-
-	TypeSchema string
-	TypeName   string
-
+	TableOID           int
+	ColumnNum          int
+	ColumnName         string
+	TypeOID            int
 	IsNullable         bool
 	HasDefault         bool
 	ArrayDims          int
@@ -105,18 +102,18 @@ type Column struct {
 	NumericScale       sql.NullInt32
 }
 
-func (Queries) Columns(ctx context.Context, exec Executor, tableNames []string) ([]Column, error) {
+func (Queries) Columns(
+	ctx context.Context, exec Executor,
+	tableOIDs []int,
+) ([]Column, error) {
 	return QueryAll(
 		ctx, exec,
 		func(scan pgx.Rows, v *Column) error {
 			return scan.Scan(
-				&v.SchemaName,
-				&v.TableName,
+				&v.TableOID,
+				&v.ColumnNum,
 				&v.ColumnName,
-
-				&v.TypeSchema,
-				&v.TypeName,
-
+				&v.TypeOID,
 				&v.IsNullable,
 				&v.HasDefault,
 				&v.ArrayDims,
@@ -128,166 +125,127 @@ func (Queries) Columns(ctx context.Context, exec Executor, tableNames []string) 
 				&v.NumericScale,
 			)
 		},
-		queryColumnsSQL, tableNames)
+		queryColumnsSQL, tableOIDs)
 }
 
 //go:embed sql/constraints.sql
 var queryTableConstraintsSQL string
 
 type Constraint struct {
-	SchemaName string
-
-	ConstraintOID  int
-	ConstraintName string
-
+	ConstraintOID    int
+	ConstraintName   string
+	SchemaName       string
 	ConstraintType   string
 	NullsNotDistinct bool
 	ConstraintDef    string
-
-	TableOID  int
-	TableName string
-	Columns   []string
-
-	ForeignTableOID   sql.NullInt32
-	ForeignSchemaName sql.NullString
-	ForeignTableName  sql.NullString
-	ForeignColumns    []sql.NullString
+	TableOID         int
+	Colnums          []int
+	ForeignTableOID  sql.NullInt32
+	ForeignColnums   []int
 }
 
 func (Queries) Constraints(
 	ctx context.Context,
 	exec Executor,
-	tableNames []string,
+	tableOIDs []int,
 ) ([]Constraint, error) {
 	return QueryAll(
 		ctx, exec,
 		func(scan pgx.Rows, v *Constraint) error {
 			return scan.Scan(
-				&v.SchemaName,
-
 				&v.ConstraintOID,
 				&v.ConstraintName,
-
+				&v.SchemaName,
 				&v.ConstraintType,
 				&v.NullsNotDistinct,
 				&v.ConstraintDef,
-
 				&v.TableOID,
-				&v.TableName,
-				&v.Columns,
-
+				&v.Colnums,
 				&v.ForeignTableOID,
-				&v.ForeignSchemaName,
-				&v.ForeignTableName,
-				&v.ForeignColumns,
+				&v.ForeignColnums,
 			)
 		},
-		queryTableConstraintsSQL, tableNames)
+		queryTableConstraintsSQL, tableOIDs)
 }
 
 //go:embed sql/types.sql
 var querySelectTypesSQL string
 
 type Type struct {
-	SchemaName             string
+	TypeOID                int
+	TypeSchema             string
 	TypeName               string
 	TypeType               string
 	IsArray                bool
-	ElemTypeSchema         sql.NullString
-	ElemTypeName           sql.NullString
+	ElemTypeOID            sql.NullInt32
+	DomainTypeOID          sql.NullInt32
 	DomainIsNotNullable    bool
-	DomainSchema           sql.NullString
-	DomainType             sql.NullString
 	DomainCharacterMaxSize sql.NullInt32
 	DomainIsNumeric        bool
 	DomainNumericPrecision sql.NullInt32
 	DomainNumericScale     sql.NullInt32
 	DomainArrayDims        int
-	RangeElementTypeSchema sql.NullString
-	RangeElementTypeName   sql.NullString
-	MultiRangeTypeSchema   sql.NullString
-	MultiRangeTypeName     sql.NullString
-	EnumValues             []string
+	RangeElementTypeOID    sql.NullInt32
 }
 
-func (Queries) Types(ctx context.Context, exec Executor, typeNames []string) ([]Type, error) {
+func (Queries) Types(
+	ctx context.Context, exec Executor,
+	typeOIDs []int,
+) ([]Type, error) {
 	return QueryAll(
 		ctx, exec,
 		func(scan pgx.Rows, v *Type) error {
 			return scan.Scan(
-				&v.SchemaName,
+				&v.TypeOID,
+				&v.TypeSchema,
 				&v.TypeName,
 				&v.TypeType,
-
 				&v.IsArray,
-				&v.ElemTypeSchema,
-				&v.ElemTypeName,
-
+				&v.ElemTypeOID,
+				&v.DomainTypeOID,
 				&v.DomainIsNotNullable,
-				&v.DomainSchema,
-				&v.DomainType,
 				&v.DomainCharacterMaxSize,
 				&v.DomainIsNumeric,
 				&v.DomainNumericPrecision,
 				&v.DomainNumericScale,
 				&v.DomainArrayDims,
-
-				&v.RangeElementTypeSchema,
-				&v.RangeElementTypeName,
-				&v.MultiRangeTypeSchema,
-				&v.MultiRangeTypeName,
-
-				&v.EnumValues,
+				&v.RangeElementTypeOID,
 			)
 		},
-		querySelectTypesSQL, typeNames)
+		querySelectTypesSQL, typeOIDs)
 }
 
 //go:embed sql/indexes.sql
 var queryIndexesSQL string
 
 type Index struct {
-	TableOID    int
-	TableSchema string
-	TableName   string
-
-	IndexOID    int
-	IndexSchema string
-	IndexName   string
-
-	ConstraintOID    sql.NullInt32
-	ConstraintSchema sql.NullString
-	ConstraintName   sql.NullString
-
+	TableOID           int
+	IndexOID           int
+	IndexSchema        string
+	IndexName          string
+	ConstraintOID      sql.NullInt32
 	IsUnique           bool
 	IsPrimary          bool
 	IsNullsNotDistinct bool
-	Columns            []string
+	Columns            []int
 	IndexDefinition    string
 }
 
 func (Queries) Indexes(
 	ctx context.Context,
 	exec Executor,
-	tableNames []string,
-	constraints []string,
+	tableOIDs []int,
+	constraintOIDs []int,
 ) ([]Index, error) {
 	return QueryAll(
 		ctx, exec,
 		func(scan pgx.Rows, v *Index) error {
 			return scan.Scan(
 				&v.TableOID,
-				&v.TableSchema,
-				&v.TableName,
-
 				&v.IndexOID,
 				&v.IndexSchema,
 				&v.IndexName,
-
 				&v.ConstraintOID,
-				&v.ConstraintSchema,
-				&v.ConstraintName,
-
 				&v.IsUnique,
 				&v.IsPrimary,
 				&v.IsNullsNotDistinct,
@@ -295,5 +253,29 @@ func (Queries) Indexes(
 				&v.IndexDefinition,
 			)
 		},
-		queryIndexesSQL, tableNames, constraints)
+		queryIndexesSQL, tableOIDs, constraintOIDs)
+}
+
+//go:embed sql/enums.sql
+var queryEnumsSQL string
+
+type Enum struct {
+	TypeOID int
+	Values  []string
+}
+
+func (Queries) Enums(
+	ctx context.Context,
+	exec Executor,
+	enumTypeOIDs []int,
+) ([]Enum, error) {
+	return QueryAll(
+		ctx, exec,
+		func(scan pgx.Rows, v *Enum) error {
+			return scan.Scan(
+				&v.TypeOID,
+				&v.Values,
+			)
+		},
+		queryEnumsSQL, enumTypeOIDs)
 }

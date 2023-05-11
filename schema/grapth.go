@@ -6,33 +6,27 @@ import (
 )
 
 type Graph struct {
-	Schema *Schema
 	// map[текущая_таблица][таблицы_для_которых_текущая_это_внешняя]внешняя_таблица
-	Graph map[string]map[string]*Table
+	Graph map[int]map[int]*Table
 }
 
-func NewGraph(schema *Schema) *Graph {
-	g := &Graph{
-		Schema: schema,
+func NewGraph(tables map[int]*Table) *Graph {
+	g := &Graph{}
+
+	g.Graph = make(map[int]map[int]*Table, len(tables))
+	for _, table := range tables {
+		foreignTables := make(map[int]*Table, len(table.ForeignKeys))
+		g.Graph[table.OID()] = foreignTables
+		for _, ref := range table.ReferencedBy {
+			foreignTables[ref.Table.OID()] = ref.Table
+		}
 	}
-	g.build()
 	return g
 }
 
-func (g *Graph) build() {
-	g.Graph = make(map[string]map[string]*Table, len(g.Schema.Tables))
-	for tablename, table := range g.Schema.Tables {
-		foreignTables := make(map[string]*Table, len(table.ForeignKeys))
-		g.Graph[tablename] = foreignTables
-		for _, ref := range table.ReferencedBy {
-			foreignTables[ref.Table.String()] = ref.Table
-		}
-	}
-}
-
-func (g *Graph) GetDepth() map[string]int {
+func (g *Graph) GetDepth() map[int]int {
 	// Initialize indegrees
-	inDegrees := make(map[string]int)
+	inDegrees := make(map[int]int)
 	for parent, neighbors := range g.Graph {
 		for neighbor := range neighbors {
 			if parent == neighbor {
@@ -45,22 +39,22 @@ func (g *Graph) GetDepth() map[string]int {
 	return inDegrees
 }
 
-func (g *Graph) TopologicalSort() ([]string, error) {
+func (g *Graph) TopologicalSort() ([]int, error) {
 	// Create a slice to store the result
-	result := make([]string, 0, len(g.Graph))
+	result := make([]int, 0, len(g.Graph))
 
 	// Initialize indegrees
 	inDegrees := g.GetDepth()
 
 	// sorted order
-	keys := make([]string, 0, len(g.Graph))
-	for tableName := range g.Graph {
-		keys = append(keys, tableName)
+	keys := make([]int, 0, len(g.Graph))
+	for tableOID := range g.Graph {
+		keys = append(keys, tableOID)
 	}
-	sort.Strings(keys)
+	sort.Ints(keys)
 
 	// Add all nodes with no incoming edges to the queue
-	queue := make([]string, 0, len(g.Graph))
+	queue := make([]int, 0, len(g.Graph))
 	for _, node := range keys {
 		inDegree := inDegrees[node]
 		if inDegree == 0 {
@@ -75,7 +69,7 @@ func (g *Graph) TopologicalSort() ([]string, error) {
 		queue = queue[1:]
 		result = append(result, node)
 
-		var enqueue []string
+		var enqueue []int
 		// Decrement the indegrees of all neighbors
 		for neighbor := range g.Graph[node] {
 			inDegrees[neighbor]--
@@ -84,7 +78,7 @@ func (g *Graph) TopologicalSort() ([]string, error) {
 			}
 		}
 		// sorted order
-		sort.Strings(enqueue)
+		sort.Ints(enqueue)
 		queue = append(queue, enqueue...)
 	}
 

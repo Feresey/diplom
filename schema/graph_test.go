@@ -10,176 +10,176 @@ import (
 func TestTopologicalSort(t *testing.T) {
 	tables := []struct {
 		name     string
-		graph    map[string]map[string]*Table
-		expected []string
+		graph    map[int]map[int]*Table
+		expected []int
 	}{
 		{
 			"Single Table",
-			map[string]map[string]*Table{
-				"table1": {},
+			map[int]map[int]*Table{
+				1: {},
 			},
-			[]string{"table1"},
+			[]int{1},
 		},
 		{
 			"No Tables",
-			map[string]map[string]*Table{},
-			[]string{},
+			map[int]map[int]*Table{},
+			[]int{},
 		},
 		{
 			"No Relationships",
-			map[string]map[string]*Table{
-				"table1": {},
-				"table2": {},
+			map[int]map[int]*Table{
+				1: {},
+				2: {},
 			},
-			[]string{"table1", "table2"},
+			[]int{1, 2},
 		},
 		{
 			"Simple Graph with One Cycle",
-			map[string]map[string]*Table{
-				"table1": {
-					"table2": nil,
-					"table3": nil,
+			map[int]map[int]*Table{
+				1: {
+					2: nil,
+					3: nil,
 				},
-				"table2": {
-					"table1": nil, // This is the cycle
-					"table4": nil,
+				2: {
+					1: nil, // This is the cycle
+					4: nil,
 				},
-				"table3": {
-					"table4": nil,
+				3: {
+					4: nil,
 				},
-				"table4": {},
+				4: {},
 			},
 			nil,
 		},
 		{
 			"Simple Graph with Two Cycles",
-			map[string]map[string]*Table{
-				"table1": {
-					"table2": nil,
-					"table3": nil,
+			map[int]map[int]*Table{
+				1: {
+					2: nil,
+					3: nil,
 				},
-				"table2": {
-					"table4": nil,
+				2: {
+					4: nil,
 				},
-				"table3": {
-					"table2": nil,
-					"table4": nil,
+				3: {
+					2: nil,
+					4: nil,
 				},
-				"table4": {
-					"table1": nil, // This is the first cycle
-					"table5": nil,
+				4: {
+					1: nil, // This is the first cycle
+					5: nil,
 				},
-				"table5": {
-					"table4": nil, // This is the second cycle
+				5: {
+					4: nil, // This is the second cycle
 				},
 			},
 			nil,
 		},
 		{
 			"Graph with All Tables Connected to One",
-			map[string]map[string]*Table{
-				"table1": {
-					"table2": nil,
-					"table3": nil,
-					"table4": nil,
+			map[int]map[int]*Table{
+				1: {
+					2: nil,
+					3: nil,
+					4: nil,
 				},
-				"table2": {
-					"table3": nil,
-					"table4": nil,
+				2: {
+					3: nil,
+					4: nil,
 				},
-				"table3": {
-					"table4": nil,
+				3: {
+					4: nil,
 				},
-				"table4": {},
+				4: {},
 			},
-			[]string{"table1", "table2", "table3", "table4"},
+			[]int{1, 2, 3, 4},
 		},
 		{
 			"Graph with Tables Connected in a Chain",
-			map[string]map[string]*Table{
-				"table1": {
-					"table2": nil,
+			map[int]map[int]*Table{
+				1: {
+					2: nil,
 				},
-				"table2": {
-					"table3": nil,
+				2: {
+					3: nil,
 				},
-				"table3": {
-					"table4": nil,
+				3: {
+					4: nil,
 				},
-				"table4": {},
+				4: {},
 			},
-			[]string{"table1", "table2", "table3", "table4"},
+			[]int{1, 2, 3, 4},
 		},
 		{
 			"Graph with Multiple Independent Cycles",
-			map[string]map[string]*Table{
-				"table1": {
-					"table2": nil,
-					"table3": nil,
+			map[int]map[int]*Table{
+				1: {
+					2: nil,
+					3: nil,
 				},
-				"table2": {
-					"table4": nil,
+				2: {
+					4: nil,
 				},
-				"table3": {
-					"table5": nil,
+				3: {
+					5: nil,
 				},
-				"table4": {
-					"table1": nil,
+				4: {
+					1: nil,
 				},
-				"table5": {
-					"table3": nil,
+				5: {
+					3: nil,
 				},
 			},
 			nil,
 		},
 		{
 			"Graph with Self-Referencing Table",
-			map[string]map[string]*Table{
-				"table1": {
-					"table1": nil,
+			map[int]map[int]*Table{
+				1: {
+					1: nil,
 				},
 			},
-			[]string{"table1"},
+			[]int{1},
 		},
 		{
 			"Graph with Many Tables and Relationships",
-			map[string]map[string]*Table{
-				"table1": {
-					"table2": nil,
-					"table3": nil,
+			map[int]map[int]*Table{
+				1: {
+					2: nil,
+					3: nil,
 				},
-				"table2": {
-					"table4": nil,
-					"table5": nil,
+				2: {
+					4: nil,
+					5: nil,
 				},
-				"table3": {
-					"table6": nil,
-					"table7": nil,
+				3: {
+					6: nil,
+					7: nil,
 				},
-				"table4": {
-					"table8": nil,
-					"table9": nil,
+				4: {
+					8: nil,
+					9: nil,
 				},
-				"table5": {
-					"table9": nil,
+				5: {
+					9: nil,
 				},
-				"table6": {
-					"table10": nil,
-					"table11": nil,
+				6: {
+					10: nil,
+					11: nil,
 				},
-				"table7": {
-					"table11": nil,
+				7: {
+					11: nil,
 				},
-				"table8":  {},
-				"table9":  {},
-				"table10": {},
-				"table11": {},
+				8:  {},
+				9:  {},
+				10: {},
+				11: {},
 			},
-			[]string{
-				"table1", "table2", "table3",
-				"table4", "table5", "table6",
-				"table7", "table8", "table9",
-				"table10", "table11",
+			[]int{
+				1, 2, 3,
+				4, 5, 6,
+				7, 8, 9,
+				10, 11,
 			},
 		},
 	}

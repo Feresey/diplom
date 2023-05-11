@@ -95,18 +95,17 @@ func (p *ParseCommand) Run(ctx *cli.Context) error {
 	}
 	p.log.Info("schema parsed")
 
-	g := schema.NewGraph(s)
-
+	g := schema.NewGraph(s.Tables)
 	if _, err := g.TopologicalSort(); err != nil {
 		return fmt.Errorf("try to determine tables order: %w", err)
 	}
 
 	outputPath := p.pf.outputPath.Get(ctx)
 
-	return p.dump(g, outputPath)
+	return p.dump(s, outputPath)
 }
 
-func (p *ParseCommand) dump(graph *schema.Graph, dumpPath string) error {
+func (p *ParseCommand) dump(s *schema.Schema, dumpPath string) error {
 	slog := p.log.Sugar()
 
 	if err := p.createDirIfNotExist(dumpPath); err != nil {
@@ -115,13 +114,13 @@ func (p *ParseCommand) dump(graph *schema.Graph, dumpPath string) error {
 
 	schemaDumpPath := filepath.Join(dumpPath, "schema.sql")
 	slog.Infof("dump sql to %q", schemaDumpPath)
-	if err := p.dumpTemplate(schemaDumpPath, graph, schema.DumpSchemaTemplate); err != nil {
+	if err := p.dumpTemplate(schemaDumpPath, s, schema.DumpSchemaTemplate); err != nil {
 		return fmt.Errorf("failed to dump sql schema: %w", err)
 	}
 
 	graphDumpPath := filepath.Join(dumpPath, "graph.puml")
 	slog.Infof("dump graph to %q", graphDumpPath)
-	if err := p.dumpTemplate(graphDumpPath, graph, schema.DumpGrapthTemplate); err != nil {
+	if err := p.dumpTemplate(graphDumpPath, s, schema.DumpGrapthTemplate); err != nil {
 		return fmt.Errorf("failed to dump grapth: %w", err)
 	}
 
@@ -134,7 +133,7 @@ func (p *ParseCommand) dump(graph *schema.Graph, dumpPath string) error {
 	if err := p.dumpToFile(jsonDumpPath, func(w io.Writer) error {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		return enc.Encode(graph.Schema)
+		return enc.Encode(s)
 	}); err != nil {
 		return fmt.Errorf("failed to dump json schema: %w", err)
 	}
@@ -159,10 +158,10 @@ func (p *ParseCommand) createDirIfNotExist(path string) error {
 
 func (p *ParseCommand) dumpTemplate(
 	fileName string,
-	g *schema.Graph, tpl schema.TemplateName,
+	s *schema.Schema, tpl schema.TemplateName,
 ) (err error) {
 	return p.dumpToFile(fileName, func(w io.Writer) error {
-		return g.Dump(w, tpl)
+		return s.Dump(w, tpl)
 	})
 }
 

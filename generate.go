@@ -9,7 +9,6 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/Feresey/mtest/generate"
-	"github.com/Feresey/mtest/schema"
 )
 
 type generateFlags struct {
@@ -94,9 +93,7 @@ func (p *generateCommand) GenerateRecords(ctx *cli.Context) error {
 		return err
 	}
 
-	graph := schema.NewGraph(s)
-
-	gen, err := generate.New(p.log, graph)
+	gen, err := generate.New(p.log, s.Tables)
 	if err != nil {
 		return err
 	}
@@ -127,9 +124,8 @@ func (p *generateCommand) DefaultsCommand() *cli.Command {
 			if err != nil {
 				return err
 			}
-			graph := schema.NewGraph(s)
 
-			gen, err := generate.New(p.log, graph)
+			gen, err := generate.New(p.log, s.Tables)
 			if err != nil {
 				return err
 			}

@@ -3,6 +3,7 @@ package generate
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -15,26 +16,32 @@ import (
 )
 
 type Generator struct {
-	tables map[string]*schema.Table
-	order  []string
+	tables map[int]*schema.Table
+	order  []*schema.Table
 
 	log *zap.Logger
 }
 
 func New(
 	log *zap.Logger,
-	graph *schema.Graph,
+	tables map[int]*schema.Table,
 ) (*Generator, error) {
+	graph := schema.NewGraph(tables)
 	order, err := graph.TopologicalSort()
 	if err != nil {
 		return nil, err
 	}
-	log.Info("tables insert order", zap.Strings("order", order))
+	log.Info("tables insert order", zap.Ints("order", order))
+
+	tablesOrdered := make([]*schema.Table, 0, len(order))
+	for _, tableOID := range order {
+		tablesOrdered = append(tablesOrdered, tables[tableOID])
+	}
 
 	g := &Generator{
 		log:    log,
-		tables: graph.Schema.Tables,
-		order:  order,
+		tables: tables,
+		order:  tablesOrdered,
 	}
 	return g, nil
 }
@@ -57,31 +64,26 @@ func (g *Generator) GenerateRecords(
 	res := make(map[string]*Records, len(g.order))
 
 	// порядок обхода, найденный топологической сортировкой
-	for _, tableName := range g.order {
-		table, ok := g.tables[tableName]
-		if !ok {
-			return nil, fmt.Errorf("table %q not found in schema", tableName)
-		}
-
+	for _, table := range g.order {
 		// TODO генерить дефолтные значения нужно вне этой функции
 		// если нет проверок для текущей таблицы, то будут дефолтные проверки.
-		tablePartialRecords, ok := partialRecords[tableName]
+		tablePartialRecords, ok := partialRecords[table.Name.String()]
 		if !ok {
-			g.log.Info("generate default checks for table", zap.String("table", tableName))
+			g.log.Info("generate default checks for table", zap.Stringer("table", table.Name))
 			checks := g.getDefaultTableChecks(table)
 			// TODO configure mergeChecks
 			tablePartialRecords = g.transformChecks(table, checks, true)
 		}
 
-		domain, ok := domains[tableName]
+		domain, ok := domains[table.Name.String()]
 		if !ok {
 			domain = CustomTableDomain{
 				ColumnDomains: make(map[string]Domain),
 			}
 		}
 
-		for colName, col := range table.Columns {
-			_, ok := domain.ColumnDomains[colName]
+		for _, col := range table.Columns {
+			_, ok := domain.ColumnDomains[col.Name]
 			if ok {
 				continue
 			}
@@ -89,7 +91,7 @@ func (g *Generator) GenerateRecords(
 			if err != nil {
 				return nil, err
 			}
-			domain.ColumnDomains[colName] = defaultDomain
+			domain.ColumnDomains[col.Name] = defaultDomain
 		}
 
 		tgen := newTableGenerator(table, domain)
@@ -98,7 +100,7 @@ func (g *Generator) GenerateRecords(
 		if err != nil {
 			return nil, err
 		}
-		res[tableName] = records
+		res[table.Name.String()] = records
 	}
 
 	return res, nil
@@ -186,20 +188,20 @@ type tableGenerator struct {
 	domains CustomTableDomain
 
 	// уникальные индексы таблицы
-	uniqueIndexes map[string]*schema.Index
+	uniqueIndexes map[int]*schema.Index
 	// множество значений отдельных колонок
 	// map[col_name]map[value]struct{}
 	colValues map[string]mapset.Set[string]
 	// для каждого уникального индекса показывает заполненные его значения
 	// map[index_name]map[composite_value]struct{}
-	uniqueIndexValues map[string]mapset.Set[string]
+	uniqueIndexValues map[int]mapset.Set[string]
 }
 
 func newTableGenerator(
 	table *schema.Table,
 	domain CustomTableDomain,
 ) *tableGenerator {
-	uniqueIndexes := make(map[string]*schema.Index)
+	uniqueIndexes := make(map[int]*schema.Index)
 	for indexName, index := range table.Indexes {
 		if index.IsUnique {
 			uniqueIndexes[indexName] = index
@@ -212,14 +214,14 @@ func newTableGenerator(
 
 		colValues:         make(map[string]mapset.Set[string], len(table.Columns)),
 		uniqueIndexes:     uniqueIndexes,
-		uniqueIndexValues: make(map[string]mapset.Set[string], len(uniqueIndexes)),
+		uniqueIndexValues: make(map[int]mapset.Set[string], len(uniqueIndexes)),
 	}
 
 	for indexName := range uniqueIndexes {
 		t.uniqueIndexValues[indexName] = mapset.NewThreadUnsafeSet[string]()
 	}
-	for colName := range table.Columns {
-		t.colValues[colName] = mapset.NewThreadUnsafeSet[string]()
+	for _, col := range table.Columns {
+		t.colValues[col.Name] = mapset.NewThreadUnsafeSet[string]()
 	}
 
 	return t
@@ -228,8 +230,20 @@ func newTableGenerator(
 func (g *tableGenerator) generateTableRecords(
 	partialRecords PartialRecords,
 ) (records *Records, err error) {
+	colNames := make([]string, 0, len(g.table.Columns))
+	for _, col := range g.table.Columns {
+		colNames = append(colNames, col.Name)
+	}
+	rev := make(map[string]int, len(g.table.Columns))
+	for colNum, col := range g.table.Columns {
+		rev[col.Name] = colNum
+	}
+	sort.Slice(colNames, func(i, j int) bool {
+		return rev[colNames[i]] < rev[colNames[j]]
+	})
+
 	records = &Records{
-		Columns: g.table.ColumnNames,
+		Columns: colNames,
 	}
 
 	// Для каждой полученной частичной записи надо догенерировать значения отсутствующих колонок
@@ -239,9 +253,9 @@ func (g *tableGenerator) generateTableRecords(
 			return nil, err
 		}
 
-		// запись колонок в таком же порядке как и g.table.ColumnNames
-		recordOrdered := make([]string, 0, len(g.table.ColumnNames))
-		for _, colName := range g.table.ColumnNames {
+		// запись колонок в таком же порядке как и colNames
+		recordOrdered := make([]string, 0, len(colNames))
+		for _, colName := range colNames {
 			recordOrdered = append(recordOrdered, record[colName])
 		}
 		records.Values = append(records.Values, recordOrdered)
@@ -265,29 +279,23 @@ func (g *tableGenerator) generateRecordValues(precord PartialRecord) (map[string
 		record[colName] = precord.Values[idx]
 	}
 
-	for _, colName := range g.table.ColumnNames {
-		if _, ok := record[colName]; ok {
+	for _, col := range g.table.Columns {
+		if _, ok := record[col.Name]; ok {
 			continue
 		}
-		col, ok := g.table.Columns[colName]
-		if !ok {
-			return nil, fmt.Errorf(
-				"internal error: column %q not found for table %q",
-				colName, g.table.Name)
-		}
 
-		domain, ok := g.domains.ColumnDomains[colName]
+		domain, ok := g.domains.ColumnDomains[col.Name]
 		if !ok {
 			return nil, fmt.Errorf(
 				"internal error: unable to find column domain for column %q for table %q",
-				colName, g.table.Name)
+				col.Name, g.table.Name)
 		}
 
 		if ok := g.generateAndCheckValue(col, domain, record); !ok {
 			// TODO по идее по исчерпании домена надо текущую запись пропускать и продолжить
 			return nil, fmt.Errorf(
 				"unable to generate values within expiration of domain. column %q, table %q",
-				colName, g.table.Name)
+				col.Name, g.table.Name)
 		}
 	}
 
@@ -335,8 +343,8 @@ func (g *tableGenerator) concatIndexColumnsFromRecord(
 	index *schema.Index,
 ) string {
 	fields := make([]string, 0, len(index.Columns))
-	for colName := range index.Columns {
-		fields = append(fields, strconv.Quote(record[colName]))
+	for _, col := range index.Columns {
+		fields = append(fields, strconv.Quote(record[col.Name]))
 	}
 	return strings.Join(fields, ",")
 }

@@ -2,6 +2,8 @@ package generate
 
 import (
 	"sort"
+
+	"github.com/Feresey/mtest/schema"
 )
 
 type ColumnChecks struct {
@@ -38,23 +40,21 @@ func (p PartialRecord) Swap(i, j int) {
 	p.Values[i], p.Values[j] = p.Values[j], p.Values[i]
 }
 
-func sortPartialByNames(pr PartialRecord, columns []string) {
-	sorted := make(map[string]int, len(pr.Columns))
-	target := make(map[string]int, len(columns))
-	for idx, value := range pr.Columns {
-		sorted[value] = idx
-	}
-	idx := 0
-	for _, value := range columns {
-		if _, ok := sorted[value]; ok {
-			target[value] = idx
-			idx++
-		}
-	}
+type sortRecordByNames struct {
+	PartialRecord
+	rev map[string]int
+}
 
-	for col, idx := range sorted {
-		pr.Swap(idx, target[col])
+func (r *sortRecordByNames) Less(i, j int) bool {
+	return r.rev[r.PartialRecord.Columns[i]] < r.rev[r.PartialRecord.Columns[j]]
+}
+
+func sortPartialByNames(pr PartialRecord, columns map[int]*schema.Column) {
+	rev := make(map[string]int, len(pr.Columns))
+	for colNum, col := range columns {
+		rev[col.Name] = colNum
 	}
+	sort.Sort(&sortRecordByNames{rev: rev, PartialRecord: pr})
 }
 
 type PartialRecords []PartialRecord

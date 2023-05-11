@@ -22,9 +22,9 @@ func TestParse(t *testing.T) {
 	}{
 		{
 			name:    "simple",
-			tables:  []queries.Tables{{Table: "table"}},
-			columns: []queries.Column{{TableName: "table", ColumnName: "col", TypeName: "type"}},
-			types:   []queries.Type{{TypeName: "type", TypeType: "b"}},
+			tables:  []queries.Tables{{Table: "table", OID: 1}},
+			columns: []queries.Column{{ColumnNum: 1, ColumnName: "col", TableOID: 1, TypeOID: 2}},
+			types:   []queries.Type{{TypeOID: 2, TypeName: "type", TypeType: "b"}},
 		},
 	}
 

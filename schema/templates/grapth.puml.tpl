@@ -1,6 +1,6 @@
 @startuml grapth
 {{- /* range tables */}}
-{{- range .Schema.Tables}}
+{{- range $.Schema.Tables}}
 {{- $table := .}}
 class {{$table.Name}} {
   {{- /* with pk */}}
@@ -22,22 +22,24 @@ class {{$table.Name}} {
   {{- /* range fk */}}
   {{- end}}
   {{- /* range columns */}}
-  {{- range .ColumnNames}}{{with index $table.Columns .}}
+  {{- range .Columns}}
     {{- if or (isPK $table .) (isFK $table .)}}
     {{- else}}
   {{.Name}}: {{template "smalltype" .}}
     {{- end}}
   {{- /* range columns */}}
-  {{- end}}{{end}}
+  {{- end}}
 }
 {{/* range tables */}}
 {{- end}}
 
-{{- $degrees := (.GetDepth)}}
-{{- range $rel_from := ($.TopologicalSort)}}
-{{- $relations := index $.Graph .}}
+{{- $degrees := ($.Graph.GetDepth)}}
+{{- range $rel_from := ($.Graph.TopologicalSort)}}
+{{- $relations := index $.Graph.Graph .}}
 {{- range $rel_to, $table := $relations}}
-{{$rel_from}} {{ repeat (index $degrees $rel_to) "-"}}{ {{$rel_to}}
+{{index $.Schema.Tables $rel_from}}
+{{- " "}}{{- repeat (index $degrees $rel_to) "-" -}}{{"{ "}}
+{{- index $.Schema.Tables $rel_to}}
 {{- end}}
 {{- end}}
 
