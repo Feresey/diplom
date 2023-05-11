@@ -30,7 +30,7 @@ func NewSchemaLoaderFlags() schemaLoaderFlags {
 			Action: func(ctx *cli.Context, fpath string) error {
 				fileInfo, err := os.Stat(fpath)
 				if os.IsNotExist(err) {
-					return fmt.Errorf("file %s does not exist", fpath)
+					return fmt.Errorf("dump file %q does not exist", fpath)
 				}
 				if fileInfo.IsDir() {
 					return fmt.Errorf("%q is a directory, expected file", fpath)
@@ -38,7 +38,7 @@ func NewSchemaLoaderFlags() schemaLoaderFlags {
 				if fileInfo.Mode().IsRegular() && fileInfo.Mode().Perm()&(1<<2) != 0 {
 					return nil
 				} else {
-					return fmt.Errorf("file %s exists but is not readable", fpath)
+					return fmt.Errorf("file %q exists but is not readable", fpath)
 				}
 			},
 		},
@@ -99,7 +99,7 @@ func (p *schemaLoader) GetSchema(
 
 func (p *schemaLoader) getSchemaFromFile(filename string) (s *schema.Schema, err error) {
 	p.log.Debug("load schema from file", zap.String("filename", filename))
-	defer p.log.Info("schema loaded", zap.Error(err))
+	defer p.log.Info("schema loaded", zap.Error(err), zap.String("filename", filename))
 	var in io.Reader
 	if filename == "-" {
 		in = os.Stdin

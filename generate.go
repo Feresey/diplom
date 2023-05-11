@@ -18,6 +18,14 @@ type generateFlags struct {
 	outputPath *cli.StringFlag
 }
 
+func (f generateFlags) Set() []cli.Flag {
+	return append(
+		f.flags.Set(),
+		f.outputPath,
+		f.schema.dumpPath,
+	)
+}
+
 type generateCommand struct {
 	flags generateFlags
 	baseCommand
@@ -30,10 +38,22 @@ func NewGenerateCommand(f flags) *generateCommand {
 		flags: generateFlags{
 			flags: f,
 			outputPath: &cli.StringFlag{
-				Name:     "output",
-				Required: true,
-				Usage:    "-o outdir",
-				Aliases:  []string{"o"},
+				Name: "output",
+				Action: func(ctx *cli.Context, dirname string) error {
+					// Проверяем, существует ли директория
+					info, err := os.Stat(dirname)
+					if err != nil {
+						return fmt.Errorf("output path does not exist: %q", dirname)
+					}
+
+					// Проверяем, является ли это директорией
+					if !info.IsDir() {
+						return fmt.Errorf("output path is not a directory: %q", dirname)
+					}
+					return nil
+				},
+				Usage:   "-o outdir",
+				Aliases: []string{"o"},
 			},
 			schema: NewSchemaLoaderFlags(),
 		},
@@ -44,13 +64,9 @@ func (p *generateCommand) Command() *cli.Command {
 	return &cli.Command{
 		Name:        "generate",
 		Description: "generate records",
-		Flags: append(
-			p.flags.Set(),
-			p.flags.outputPath,
-			p.flags.schema.dumpPath,
-		),
-		Before: p.Init,
-		Action: p.GenerateRecords,
+		Flags:       p.flags.Set(),
+		Before:      p.Init,
+		Action:      p.GenerateRecords,
 		Subcommands: []*cli.Command{
 			p.DefaultsCommand(),
 		},
@@ -102,9 +118,10 @@ func (p *generateCommand) DefaultsCommand() *cli.Command {
 	return &cli.Command{
 		Name:        "default",
 		Description: "generate default partial records",
-		Flags: []cli.Flag{
+		Flags: append(
+			p.flags.Set(),
 			defaultChecks,
-		},
+		),
 		Action: func(ctx *cli.Context) error {
 			s, err := p.schemaLoader.GetSchema(ctx, p.flags.schema)
 			if err != nil {

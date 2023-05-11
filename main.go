@@ -61,10 +61,11 @@ func main() {
 			NewParseCommand(f).Command(),
 			NewGenerateCommand(f).Command(),
 		},
+		EnableBashCompletion: true,
 	}
 	err := app.Run(os.Args)
 	if err != nil {
-		zap.L().Error(err.Error())
+		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 }
