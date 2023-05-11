@@ -43,12 +43,35 @@ type Table struct {
 	// Внешние ключи таблицы, ключ мапы - FK Name
 	ForeignKeys map[int]*ForeignKey `json:"foreign_keys,omitempty"`
 	// Ключи, которые ссылаются на эту таблицу
-	ReferencedBy map[int]*Constraint `json:"referenced_by,omitempty"`
+	ReferencedBy KeysMarshalMap[int, Constraint] `json:"referenced_by,omitempty"`
 
 	// Список всех CONSTRAINT-ов текущей таблицы
-	Constraints map[int]*Constraint `json:"constraints,omitempty"`
+	Constraints KeysMarshalMap[int, Constraint] `json:"constraints,omitempty"`
 	// Список всех INDEX-ов текущей таблицы
-	Indexes map[int]*Index `json:"indexes,omitempty"`
+	Indexes KeysMarshalMap[int, Index] `json:"indexes,omitempty"`
+}
+
+type KeysMarshalMap[K comparable, T any] map[K]*T
+
+func (k KeysMarshalMap[K, T]) MarshalJSON() ([]byte, error) {
+	arr := make([]K, 0, len(k))
+	for key := range k {
+		arr = append(arr, key)
+	}
+	return json.Marshal(arr)
+}
+
+func (k *KeysMarshalMap[K, T]) UnmarshalJSON(data []byte) error {
+	var arr []K
+	if err := json.Unmarshal(data, &arr); err != nil {
+		return err
+	}
+	res := make(KeysMarshalMap[K, T], len(arr))
+	for _, key := range arr {
+		res[key] = nil
+	}
+	*k = res
+	return nil
 }
 
 func (t *Table) String() string { return t.Name.String() }
@@ -59,14 +82,43 @@ func (t *Table) OID() int       { return t.Name.OID }
 type ForeignKey struct {
 	// CONSTRAINT в текущей таблице
 	// Foreign.Type == FK
-	Foreign *Constraint `json:"foreign,omitempty"`
+	Foreign *Constraint `json:"-"`
 	// Таблица, на которую ссылаются
-	Reference *Table `json:"reference,omitempty"`
+	Reference *Table `json:"-"`
 	// Список колонок во внешней таблице, на которые ссылается FOREIGN KEY
-	ReferenceColumns map[int]*Column `json:"reference_columns,omitempty"`
+	ReferenceColumns KeysMarshalMap[int, Column] `json:"reference_columns,omitempty"`
 }
 
 func (f *ForeignKey) String() string { return f.Foreign.String() }
+
+type (
+	fkNotJSON ForeignKey
+	fkJSON    struct {
+		fkNotJSON
+		ReferenceOID int `json:"reference,omitempty"`
+	}
+)
+
+func (f ForeignKey) MarshalJSON() ([]byte, error) {
+	return json.Marshal(fkJSON{
+		fkNotJSON:    fkNotJSON(f),
+		ReferenceOID: f.Reference.OID(),
+	})
+}
+
+func (f *ForeignKey) UnmarshalJSON(data []byte) error {
+	var v fkJSON
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*f = ForeignKey(v.fkNotJSON)
+	f.Reference = &Table{
+		Name: Identifier{
+			OID: v.ReferenceOID,
+		},
+	}
+	return nil
+}
 
 // Column описывает колонку таблицы.
 type Column struct {
@@ -227,7 +279,7 @@ type Constraint struct {
 	// Колонки всегда принадлежат той же таблице, которой принадлежит ограничение
 	// Количество колонок всегда >= 1
 	// Ключ мапы - имя колонки
-	Columns map[int]*Column `json:"columns,omitempty"`
+	Columns KeysMarshalMap[int, Column] `json:"columns,omitempty"`
 }
 
 func (c *Constraint) String() string {
@@ -241,7 +293,7 @@ type Index struct {
 	// Таблица, для которой создан индекс
 	Table *Table `json:"-"`
 	// Колонки, которые затрагивает индекс
-	Columns map[int]*Column `json:"columns,omitempty"`
+	Columns KeysMarshalMap[int, Column] `json:"columns,omitempty"`
 	// Определение индекса
 	Definition string `json:"definition,omitempty"`
 

@@ -462,6 +462,7 @@ func (p *Parser) fillType(
 	case schema.DataTypePseudo:
 	case schema.DataTypeDomain:
 		typ.DomainType = &schema.DomainType{
+			TypeName: typ.TypeName,
 			Attributes: schema.DomainAttributes{
 				NotNullable:      !dbtype.DomainIsNotNullable,
 				HasCharMaxLength: dbtype.DomainCharacterMaxSize.Valid,
@@ -474,16 +475,16 @@ func (p *Parser) fillType(
 		}
 		moreTypes = fillElemType(s.Types, s.DomainTypes, typ.DomainType, int(dbtype.DomainTypeOID.Int32))
 	case schema.DataTypeArray:
-		typ.ArrayType = &schema.ArrayType{}
+		typ.ArrayType = &schema.ArrayType{TypeName: typ.TypeName}
 		moreTypes = fillElemType(s.Types, s.ArrayTypes, typ.ArrayType, int(dbtype.ElemTypeOID.Int32))
 	case schema.DataTypeEnum:
-		typ.EnumType = &schema.EnumType{}
+		typ.EnumType = &schema.EnumType{TypeName: typ.TypeName}
 		s.EnumTypes[typ.OID()] = typ.EnumType
 	case schema.DataTypeRange:
-		typ.RangeType = &schema.RangeType{}
+		typ.RangeType = &schema.RangeType{TypeName: typ.TypeName}
 		moreTypes = fillElemType(s.Types, s.RangeTypes, typ.RangeType, int(dbtype.RangeElementTypeOID.Int32))
 	case schema.DataTypeComposite:
-		typ.CompositeType = &schema.CompositeType{}
+		typ.CompositeType = &schema.CompositeType{TypeName: typ.TypeName}
 		s.CompositeTypes[typ.OID()] = typ.CompositeType
 	}
 	return moreTypes, err

@@ -1,8 +1,8 @@
 dbconn: "postgresql://postgres:postgres@localhost:5432"
 parser:
-  # - pg_catalog
-  # - test
-  # - public
+  - pg_catalog
+  - test
+  - public
   - vuln
   - scanner
 generator:
