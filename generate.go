@@ -14,7 +14,7 @@ import (
 
 type generateFlags struct {
 	flags
-	schema     schemaLoaderFlags
+	schema     SchemaLoaderFlags
 	outputPath *cli.StringFlag
 }
 
@@ -28,12 +28,12 @@ func (f generateFlags) Set() []cli.Flag {
 
 type generateCommand struct {
 	flags generateFlags
-	baseCommand
+	BaseCommand
 
-	schemaLoader schemaLoader
+	schemaLoader SchemaLoader
 }
 
-func NewGenerateCommand(f flags) *generateCommand {
+func newGenerateCommand(f flags) *generateCommand {
 	return &generateCommand{
 		flags: generateFlags{
 			flags: f,
@@ -78,7 +78,7 @@ func (p *generateCommand) Init(ctx *cli.Context) error {
 	if err != nil {
 		return cli.Exit(err, 2)
 	}
-	p.baseCommand = base
+	p.BaseCommand = base
 	loader, err := NewSchemaLoader(ctx, base, p.flags.flags, p.flags.schema)
 	if err != nil {
 		return err

@@ -12,6 +12,10 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
+func Lint() error {
+	return sh.RunV("golangci-lint", "run")
+}
+
 func Update() error {
 	return sh.RunV("go", "get", "-u", "-v")
 }
@@ -48,8 +52,4 @@ func InstallTools() error {
 		}
 	}
 	return nil
-}
-
-func Lint() error {
-	return sh.RunV("golangci-lint", "run", "-v")
 }

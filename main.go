@@ -59,7 +59,7 @@ func main() {
 		Flags:       f.Set(),
 		Commands: []*cli.Command{
 			NewParseCommand(f).Command(),
-			NewGenerateCommand(f).Command(),
+			newGenerateCommand(f).Command(),
 		},
 		EnableBashCompletion: true,
 	}
@@ -70,13 +70,13 @@ func main() {
 	}
 }
 
-type baseCommand struct {
+type BaseCommand struct {
 	log *zap.Logger
 	cnf *AppConfig
 }
 
-func NewBase(ctx *cli.Context, f flags) (baseCommand, error) {
-	var empty baseCommand
+func NewBase(ctx *cli.Context, f flags) (BaseCommand, error) {
+	var empty BaseCommand
 	log, err := newLogger(f.debug.Get(ctx))
 	if err != nil {
 		return empty, fmt.Errorf("create logger: %w", err)
@@ -88,13 +88,13 @@ func NewBase(ctx *cli.Context, f flags) (baseCommand, error) {
 	}
 	log.Debug("config readed")
 
-	return baseCommand{
+	return BaseCommand{
 		log: log,
 		cnf: cnf,
 	}, nil
 }
 
-func (b *baseCommand) connectDB(ctx *cli.Context, debug bool) (*pgx.Conn, error) {
+func (b *BaseCommand) connectDB(ctx *cli.Context, debug bool) (*pgx.Conn, error) {
 	if debug {
 		b.cnf.DB.SetDebug(true)
 	}

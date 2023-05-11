@@ -46,7 +46,7 @@ func NewParser(
 	}
 }
 
-// TODO вернуть ошибку если данные ссылаются на не указанную схему
+// TODO вернуть ошибку если данные ссылаются на не указанную схему.
 func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, error) {
 	s := &schema.Schema{
 		Types:          make(map[string]*schema.DBType),
@@ -84,7 +84,7 @@ func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, e
 	return s, nil
 }
 
-// loadTables получает имена таблиц, найденных в схемах
+// loadTables получает имена таблиц, найденных в схемах.
 func (p *Parser) loadTables(
 	ctx context.Context,
 	s *schema.Schema,
@@ -123,7 +123,7 @@ func (p *Parser) loadTables(
 	return nil
 }
 
-// loadTablesColumns загружает колонки таблиц, включая типы и аттрибуты
+// loadTablesColumns загружает колонки таблиц, включая типы и аттрибуты.
 func (p *Parser) loadTablesColumns(ctx context.Context, s *schema.Schema) error {
 	columns, err := p.q.Columns(ctx, p.conn, s.TableNames)
 	if err != nil {
@@ -187,7 +187,7 @@ func (p *Parser) loadTablesColumns(ctx context.Context, s *schema.Schema) error 
 	return nil
 }
 
-// перевод значений колонки pg_constraint.type
+// Перевод значений колонки pg_constraint.type.
 var pgConstraintType = map[string]schema.ConstraintType{
 	"p": schema.ConstraintTypePK,
 	"f": schema.ConstraintTypeFK,
@@ -197,7 +197,7 @@ var pgConstraintType = map[string]schema.ConstraintType{
 	"x": schema.ConstraintTypeExclusion,
 }
 
-// loadConstraints загружает ограничения для всех найденных таблиц
+// loadConstraints загружает ограничения для всех найденных таблиц.
 func (p *Parser) loadConstraints(ctx context.Context, s *schema.Schema) error {
 	constraints, err := p.q.Constraints(ctx, p.conn, s.TableNames)
 	if err != nil {
@@ -475,7 +475,7 @@ func (p *Parser) loadTypesByNames(
 	return moreTypes, nil
 }
 
-// перевод значений колонки pg_type.typtype
+// Перевод значений колонки pg_type.typtype.
 var pgTypType = map[string]schema.DataType{
 	"b": schema.DataTypeBase,
 	"c": schema.DataTypeComposite,

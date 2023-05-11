@@ -16,27 +16,27 @@ import (
 	"github.com/Feresey/mtest/schema"
 )
 
-type parseFlags struct {
+type ParseFlags struct {
 	flags
 	outputPath *cli.StringFlag
 }
 
-func (pf *parseFlags) Set() []cli.Flag {
+func (pf *ParseFlags) Set() []cli.Flag {
 	return append(pf.flags.Set(),
 		pf.outputPath,
 	)
 }
 
-type parseCommand struct {
-	pf parseFlags
-	baseCommand
+type ParseCommand struct {
+	pf ParseFlags
+	BaseCommand
 
 	conn *pgx.Conn
 }
 
-func NewParseCommand(f flags) *parseCommand {
-	return &parseCommand{
-		pf: parseFlags{
+func NewParseCommand(f flags) *ParseCommand {
+	return &ParseCommand{
+		pf: ParseFlags{
 			flags: f,
 			outputPath: &cli.StringFlag{
 				Name:        "output",
@@ -48,7 +48,7 @@ func NewParseCommand(f flags) *parseCommand {
 	}
 }
 
-func (p *parseCommand) Command() *cli.Command {
+func (p *ParseCommand) Command() *cli.Command {
 	return &cli.Command{
 		Name:        "parse",
 		Description: "parse schema",
@@ -59,7 +59,7 @@ func (p *parseCommand) Command() *cli.Command {
 	}
 }
 
-func (p *parseCommand) Init(ctx *cli.Context) error {
+func (p *ParseCommand) Init(ctx *cli.Context) error {
 	base, err := NewBase(ctx, p.pf.flags)
 	if err != nil {
 		return cli.Exit(err, 2)
@@ -68,12 +68,12 @@ func (p *parseCommand) Init(ctx *cli.Context) error {
 	if err != nil {
 		return cli.Exit(err, 3)
 	}
-	p.baseCommand = base
+	p.BaseCommand = base
 	p.conn = conn
 	return nil
 }
 
-func (p *parseCommand) Cleanup(ctx *cli.Context) error {
+func (p *ParseCommand) Cleanup(ctx *cli.Context) error {
 	if p.conn == nil {
 		return nil
 	}
@@ -83,7 +83,7 @@ func (p *parseCommand) Cleanup(ctx *cli.Context) error {
 	return nil
 }
 
-func (p *parseCommand) Run(ctx *cli.Context) error {
+func (p *ParseCommand) Run(ctx *cli.Context) error {
 	parser := parse.NewParser(p.conn, p.log)
 	s, err := parser.LoadSchema(ctx.Context, p.cnf.Parser)
 	if err != nil {
@@ -106,7 +106,7 @@ func (p *parseCommand) Run(ctx *cli.Context) error {
 	return p.dump(g, outputPath)
 }
 
-func (p *parseCommand) dump(graph *schema.Graph, dumpPath string) error {
+func (p *ParseCommand) dump(graph *schema.Graph, dumpPath string) error {
 	slog := p.log.Sugar()
 
 	if err := p.createDirIfNotExist(dumpPath); err != nil {
@@ -138,7 +138,7 @@ func (p *parseCommand) dump(graph *schema.Graph, dumpPath string) error {
 	return nil
 }
 
-func (p *parseCommand) createDirIfNotExist(path string) error {
+func (p *ParseCommand) createDirIfNotExist(path string) error {
 	fileInfo, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		// Папка не существует, создаем ее
@@ -153,7 +153,7 @@ func (p *parseCommand) createDirIfNotExist(path string) error {
 	return nil
 }
 
-func (p *parseCommand) dumpTemplate(
+func (p *ParseCommand) dumpTemplate(
 	fileName string,
 	g *schema.Graph, tpl schema.TemplateName,
 ) (err error) {
@@ -162,7 +162,7 @@ func (p *parseCommand) dumpTemplate(
 	})
 }
 
-func (p *parseCommand) dumpToFile(fileName string, f func(w io.Writer) error) (err error) {
+func (p *ParseCommand) dumpToFile(fileName string, f func(w io.Writer) error) (err error) {
 	file, err := os.Create(fileName)
 	if err != nil {
 		return fmt.Errorf("create output file for dump: %w", err)

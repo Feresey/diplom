@@ -17,12 +17,12 @@ import (
 	"github.com/Feresey/mtest/schema"
 )
 
-type schemaLoaderFlags struct {
+type SchemaLoaderFlags struct {
 	dumpPath *cli.StringFlag
 }
 
-func NewSchemaLoaderFlags() schemaLoaderFlags {
-	return schemaLoaderFlags{
+func NewSchemaLoaderFlags() SchemaLoaderFlags {
+	return SchemaLoaderFlags{
 		dumpPath: &cli.StringFlag{
 			Name:    "input",
 			Aliases: []string{"i"},
@@ -37,35 +37,34 @@ func NewSchemaLoaderFlags() schemaLoaderFlags {
 				}
 				if fileInfo.Mode().IsRegular() && fileInfo.Mode().Perm()&(1<<2) != 0 {
 					return nil
-				} else {
-					return fmt.Errorf("file %q exists but is not readable", fpath)
 				}
+				return fmt.Errorf("file %s exists but is not readable", fpath)
 			},
 		},
 	}
 }
 
-type schemaLoader struct {
-	baseCommand
+type SchemaLoader struct {
+	BaseCommand
 
 	conn *pgx.Conn
 }
 
 func NewSchemaLoader(
 	ctx *cli.Context,
-	base baseCommand,
+	base BaseCommand,
 	flags flags,
-	sflags schemaLoaderFlags,
-) (schemaLoader, error) {
-	s := schemaLoader{
-		baseCommand: base,
+	sflags SchemaLoaderFlags,
+) (SchemaLoader, error) {
+	s := SchemaLoader{
+		BaseCommand: base,
 	}
 
 	err := s.Init(ctx, flags, sflags)
 	return s, err
 }
 
-func (p *schemaLoader) Init(ctx *cli.Context, flags flags, sflags schemaLoaderFlags) error {
+func (p *SchemaLoader) Init(ctx *cli.Context, flags flags, sflags SchemaLoaderFlags) error {
 	if sflags.dumpPath.Get(ctx) == "" {
 		conn, err := p.connectDB(ctx, flags.debug.Get(ctx))
 		if err != nil {
@@ -76,7 +75,7 @@ func (p *schemaLoader) Init(ctx *cli.Context, flags flags, sflags schemaLoaderFl
 	return nil
 }
 
-func (p *schemaLoader) Cleanup(ctx *cli.Context) error {
+func (p *SchemaLoader) Cleanup(ctx *cli.Context) error {
 	if p.conn == nil {
 		return nil
 	}
@@ -86,18 +85,18 @@ func (p *schemaLoader) Cleanup(ctx *cli.Context) error {
 	return nil
 }
 
-func (p *schemaLoader) GetSchema(
+func (p *SchemaLoader) GetSchema(
 	ctx *cli.Context,
-	sflags schemaLoaderFlags,
+	sflags SchemaLoaderFlags,
 ) (s *schema.Schema, err error) {
 	if filename := sflags.dumpPath.Get(ctx); filename != "" {
 		return p.getSchemaFromFile(filename)
-	} else {
-		return p.parseDB(ctx)
 	}
+	p.log.Info("schema dump path is not specified")
+	return p.parseDB(ctx)
 }
 
-func (p *schemaLoader) getSchemaFromFile(filename string) (s *schema.Schema, err error) {
+func (p *SchemaLoader) getSchemaFromFile(filename string) (s *schema.Schema, err error) {
 	p.log.Debug("load schema from file", zap.String("filename", filename))
 	defer p.log.Info("schema loaded", zap.Error(err), zap.String("filename", filename))
 	var in io.Reader
@@ -116,7 +115,7 @@ func (p *schemaLoader) getSchemaFromFile(filename string) (s *schema.Schema, err
 	return s, nil
 }
 
-func (p *schemaLoader) parseDB(ctx *cli.Context) (s *schema.Schema, err error) {
+func (p *SchemaLoader) parseDB(ctx *cli.Context) (s *schema.Schema, err error) {
 	if p.conn == nil {
 		p.log.Fatal("connection is nil")
 	}

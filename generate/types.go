@@ -59,7 +59,7 @@ func sortPartialByNames(pr PartialRecord, columns []string) {
 
 type PartialRecords []PartialRecord
 
-// MergeAdd проходится по всем частичным записям и пытается дозаписать значения текущей частичной записи
+// MergeAdd проходится по всем частичным записям и пытается дозаписать значения текущей частичной записи.
 func (p *PartialRecords) MergeAdd(r PartialRecord) {
 	sort.Sort(&r)
 
@@ -78,18 +78,19 @@ func (p *PartialRecords) merge(out *PartialRecord, curr PartialRecord) {
 	sort.Sort(out)
 }
 
-// checkNoOverlap проверяет что элементы массивов arr1 и arr2 различны
+// checkNoOverlap проверяет что элементы массивов arr1 и arr2 различны.
 func (p *PartialRecords) checkNoOverlap(arr1, arr2 []string) bool {
 	i := 0
 	j := 0
 
 	for i < len(arr1) && j < len(arr2) {
-		if arr1[i] == arr2[j] {
-			return false
-		} else if arr1[i] < arr2[j] {
+		switch {
+		case arr1[i] < arr2[j]:
 			i++
-		} else {
+		case arr1[i] > arr2[j]:
 			j++
+		case arr1[i] == arr2[j]:
+			return false
 		}
 	}
 

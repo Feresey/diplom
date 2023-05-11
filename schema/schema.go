@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// Identifier описывает имя элемента
+// Identifier описывает имя элемента.
 type Identifier struct {
 	// Row identifier
 	OID int `json:"oid,omitempty"`
@@ -17,7 +17,7 @@ type Identifier struct {
 
 func (i Identifier) String() string { return i.Schema + "." + i.Name }
 
-// Schema отражает схему, расположенную в базе данных
+// Schema отражает схему, расположенную в базе данных.
 type Schema struct {
 	Types          map[string]*DBType        `json:"types,omitempty"`
 	ArrayTypes     map[string]*ArrayType     `json:"array_types,omitempty"`
@@ -33,7 +33,7 @@ type Schema struct {
 	TableNames []string `json:"table_names,omitempty"`
 }
 
-// Table описывает таблицу базы данных
+// Table описывает таблицу базы данных.
 type Table struct {
 	// имя таблицы
 	Name Identifier `json:"name,omitempty"`
@@ -71,7 +71,7 @@ type ForeignKey struct {
 
 func (f *ForeignKey) String() string { return f.Foreign.String() }
 
-// Column описывает колонку таблицы
+// Column описывает колонку таблицы.
 type Column struct {
 	// Имя колонки
 	Name string `json:"name,omitempty"`
@@ -100,7 +100,7 @@ const (
 	DataTypePseudo              // Домен. Основан на любом другом типе и включает в себя ограничения для него
 )
 
-// DBType описывает тип данных базы
+// DBType описывает тип данных базы.
 type DBType struct {
 	// Имя типа
 	TypeName Identifier `json:"type_name,omitempty"`
@@ -181,9 +181,9 @@ type DomainAttributes struct {
 	NumericScale     int  `json:"numeric_scale,omitempty"`
 }
 
-// ColumnAttributes описывает аттрибуты колонки
+// ColumnAttributes описывает аттрибуты колонки.
 type ColumnAttributes struct {
-	DomainAttributes `json:",omitempty"`
+	DomainAttributes `json:",omitempty"` //nolint:tagliatelle // embed struct
 
 	HasDefault  bool `json:"has_default,omitempty"`
 	IsGenerated bool `json:"is_generated,omitempty"`
@@ -204,7 +204,7 @@ const (
 	ConstraintTypeExclusion
 )
 
-// Constraint описывает условие статического арбитража таблицы
+// Constraint описывает условие статического арбитража таблицы.
 type Constraint struct {
 	// Имя ограничения
 	Name Identifier `json:"name,omitempty"`
@@ -338,7 +338,7 @@ func (s *Schema) fillTypes() error {
 func fillColumns(dst, src map[string]*Column, msg string, args ...any) error {
 	for colName := range dst {
 		col, err := getValueFormat(src, colName,
-			"column %q not found for"+msg, append([]any{colName}, args...))
+			"column %q not found for"+msg, append([]any{colName}, args...)...)
 		if err != nil {
 			return err
 		}

@@ -80,7 +80,7 @@ var Checks = map[string][]string{
 	},
 }
 
-// GetDefaultChecks генерирует дефолтные проверки для всех таблиц
+// GetDefaultChecks генерирует дефолтные проверки для всех таблиц.
 func (g *Generator) GetDefaultChecks() map[string]PartialRecords {
 	res := make(map[string]PartialRecords, len(g.order))
 	for _, tableName := range g.order {
@@ -94,7 +94,7 @@ func (g *Generator) GetDefaultChecks() map[string]PartialRecords {
 	return res
 }
 
-// getDefaultTableChecks генерирует дефолтные проверки для указанной таблицы
+// getDefaultTableChecks генерирует дефолтные проверки для указанной таблицы.
 func (g *Generator) getDefaultTableChecks(table *schema.Table) map[string]*ColumnChecks {
 	checks := make(map[string]*ColumnChecks, len(table.Columns))
 
@@ -113,13 +113,13 @@ func (g *Generator) getDefaultTableChecks(table *schema.Table) map[string]*Colum
 			check.AddValues("NULL")
 		}
 
-		// если тип не является встроенным в postgresql, то я его не обрабатываю
+		// Если тип не является встроенным в postgresql, то я его не обрабатываю.
 		if col.Type.TypeName.Schema != "pg_catalog" {
 			continue
 		}
 		checks[colName] = check
 
-		// Для FK колонок нельзя делать обычные проверки на значения, т.к. они зависят от других таблиц
+		// Для FK колонок нельзя делать обычные проверки на значения, т.к. они зависят от других таблиц.
 		if _, ok := foreignColumns[colName]; ok {
 			continue
 		}
@@ -130,7 +130,7 @@ func (g *Generator) getDefaultTableChecks(table *schema.Table) map[string]*Colum
 			check.AddValues("'infinity'::NUMERIC", "'-infinity'::NUMERIC")
 		}
 
-		// Только если это текстовый тип и он имеет аттрибут CharMaxLength, то надо сгенерить строчку максимальной длины
+		// Только если это текстовый тип и он имеет аттрибут CharMaxLength, то надо сгенерить строчку максимальной длины.
 		// TODO нужно ли проверять на текстовость?
 		if attr.HasCharMaxLength {
 			check.AddValuesProcess(
@@ -151,7 +151,7 @@ func (g *Generator) transformChecks(
 ) PartialRecords {
 	var res PartialRecords
 
-	// объединение проверок отдельных колонок в частичные записи
+	// Объединение проверок отдельных колонок в частичные записи.
 	for colName, columnChecks := range checks {
 		for _, value := range columnChecks.Values {
 			pr := PartialRecord{

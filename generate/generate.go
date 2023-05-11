@@ -175,15 +175,10 @@ func numericToFloatDomainParams(precision, scale int) (top, step float64) {
 	if precision == 0 {
 		return defaultTopFloatDomain, defaultStepFloatDomain
 	}
-
 	if scale == 0 {
-		top = math.Pow10(precision) - 1
-		step = 1
-	} else {
-		top = math.Pow10(precision-scale) - math.Pow10(-scale)
-		step = math.Pow10(-scale)
+		return math.Pow10(precision) - 1, 1
 	}
-	return
+	return math.Pow10(precision-scale) - math.Pow10(-scale), math.Pow10(-scale)
 }
 
 type tableGenerator struct {
