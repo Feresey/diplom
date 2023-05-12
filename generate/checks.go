@@ -81,20 +81,24 @@ var Checks = map[string][]string{
 }
 
 // GetDefaultChecks генерирует дефолтные проверки для всех таблиц.
-func (g *Generator) GetDefaultChecks() map[string]PartialRecords {
-	res := make(map[string]PartialRecords, len(g.order))
-	for _, table := range g.order {
+func (g *Generator) GetDefaultChecks(tables []int) ([]PartialRecords, error) {
+	res := make([]PartialRecords, 0, len(g.order))
+	for _, tableOID := range tables {
+		table, ok := g.tables[tableOID]
+		if !ok {
+			return nil, fmt.Errorf("table with oid %d not found", tableOID)
+		}
 		checks := g.getDefaultTableChecks(table)
 		// TODO configure mergeChecks
 		records := g.transformChecks(table, checks, true)
-		res[table.Name.String()] = records
+		res = append(res, records)
 	}
-	return res
+	return res, nil
 }
 
 // getDefaultTableChecks генерирует дефолтные проверки для указанной таблицы.
-func (g *Generator) getDefaultTableChecks(table *schema.Table) map[string]*ColumnChecks {
-	checks := make(map[string]*ColumnChecks, len(table.Columns))
+func (g *Generator) getDefaultTableChecks(table *schema.Table) map[int]*ColumnChecks {
+	checks := make(map[int]*ColumnChecks, len(table.Columns))
 
 	foreignColumns := make(map[string]struct{}, len(table.Columns))
 	for _, fk := range table.ForeignKeys {
@@ -115,7 +119,7 @@ func (g *Generator) getDefaultTableChecks(table *schema.Table) map[string]*Colum
 		if col.Type.TypeName.Schema != "pg_catalog" {
 			continue
 		}
-		checks[col.Name] = check
+		checks[col.ColNum] = check
 
 		// Для FK колонок нельзя делать обычные проверки на значения, т.к. они зависят от других таблиц.
 		if _, ok := foreignColumns[col.Name]; ok {
@@ -144,28 +148,26 @@ func (g *Generator) getDefaultTableChecks(table *schema.Table) map[string]*Colum
 
 func (g *Generator) transformChecks(
 	table *schema.Table,
-	checks map[string]*ColumnChecks,
+	checks map[int]*ColumnChecks,
 	mergeChecks bool,
 ) PartialRecords {
-	var res PartialRecords
+	res := PartialRecords{
+		Table: table,
+	}
 
 	// Объединение проверок отдельных колонок в частичные записи.
 	for colName, columnChecks := range checks {
 		for _, value := range columnChecks.Values {
 			pr := PartialRecord{
-				Columns: []string{colName},
+				Columns: []int{colName},
 				Values:  []string{value},
 			}
 			if mergeChecks {
 				res.MergeAdd(pr)
 			} else {
-				res = append(res, pr)
+				res.Records = append(res.Records, pr)
 			}
 		}
-	}
-
-	for idx := range res {
-		sortPartialByNames(res[idx], table.Columns)
 	}
 
 	return res

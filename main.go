@@ -59,7 +59,7 @@ func main() {
 		Flags:       f.Set(),
 		Commands: []*cli.Command{
 			NewParseCommand(f).Command(),
-			newGenerateCommand(f).Command(),
+			NewGenerateCommand(f).Command(),
 		},
 		EnableBashCompletion: true,
 	}

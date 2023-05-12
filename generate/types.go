@@ -21,9 +21,9 @@ func (c *ColumnChecks) AddValuesProcess(f func(string) string, vals ...string) {
 }
 
 type PartialRecord struct {
-	// Имена колонок
-	Columns []string
-	// Матрица записей
+	// Индексы колонок
+	Columns []int
+	// Значения колонок
 	/*
 		columns: ["id", "value"]
 		values: ["0","a"]
@@ -40,24 +40,10 @@ func (p PartialRecord) Swap(i, j int) {
 	p.Values[i], p.Values[j] = p.Values[j], p.Values[i]
 }
 
-type sortRecordByNames struct {
-	PartialRecord
-	rev map[string]int
+type PartialRecords struct {
+	Records []PartialRecord
+	Table   *schema.Table
 }
-
-func (r *sortRecordByNames) Less(i, j int) bool {
-	return r.rev[r.PartialRecord.Columns[i]] < r.rev[r.PartialRecord.Columns[j]]
-}
-
-func sortPartialByNames(pr PartialRecord, columns map[int]*schema.Column) {
-	rev := make(map[string]int, len(pr.Columns))
-	for colNum, col := range columns {
-		rev[col.Name] = colNum
-	}
-	sort.Sort(&sortRecordByNames{rev: rev, PartialRecord: pr})
-}
-
-type PartialRecords []PartialRecord
 
 // MergeAdd проходится по всем частичным записям и пытается дозаписать значения текущей частичной записи.
 func (p *PartialRecords) MergeAdd(r PartialRecord) {
@@ -65,7 +51,7 @@ func (p *PartialRecords) MergeAdd(r PartialRecord) {
 
 	record := p.searchNoOverlapRecord(r.Columns)
 	if record == nil {
-		*p = append(*p, r)
+		p.Records = append(p.Records, r)
 		return
 	}
 
@@ -79,7 +65,7 @@ func (p *PartialRecords) merge(out *PartialRecord, curr PartialRecord) {
 }
 
 // checkNoOverlap проверяет что элементы массивов arr1 и arr2 различны.
-func (p *PartialRecords) checkNoOverlap(arr1, arr2 []string) bool {
+func (p *PartialRecords) checkNoOverlap(arr1, arr2 []int) bool {
 	i := 0
 	j := 0
 
@@ -97,10 +83,10 @@ func (p *PartialRecords) checkNoOverlap(arr1, arr2 []string) bool {
 	return true
 }
 
-func (p *PartialRecords) searchNoOverlapRecord(cols []string) *PartialRecord {
-	for idx, r := range *p {
+func (p *PartialRecords) searchNoOverlapRecord(cols []int) *PartialRecord {
+	for idx, r := range p.Records {
 		if p.checkNoOverlap(r.Columns, cols) {
-			return &(*p)[idx]
+			return &p.Records[idx]
 		}
 	}
 	return nil

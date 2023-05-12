@@ -35,7 +35,7 @@ type Schema struct {
 type Table struct {
 	// имя таблицы
 	Name Identifier `json:"name,omitempty"`
-	// мапа колонок, где ключ - имя колонки хранить имена как
+	// мапа колонок, где ключ - имя колонки
 	Columns map[int]*Column `json:"columns,omitempty"`
 
 	// Главный ключ таблицы (может быть nil)

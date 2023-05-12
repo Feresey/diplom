@@ -2,11 +2,17 @@ package main
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/urfave/cli/v2"
+	"go.uber.org/zap"
 
 	"github.com/Feresey/mtest/generate"
 )
@@ -25,15 +31,15 @@ func (f generateFlags) Set() []cli.Flag {
 	)
 }
 
-type generateCommand struct {
+type GenerateCommand struct {
 	flags generateFlags
 	BaseCommand
 
 	schemaLoader SchemaLoader
 }
 
-func newGenerateCommand(f flags) *generateCommand {
-	return &generateCommand{
+func NewGenerateCommand(f flags) *GenerateCommand {
+	return &GenerateCommand{
 		flags: generateFlags{
 			flags: f,
 			outputPath: &cli.StringFlag{
@@ -59,7 +65,7 @@ func newGenerateCommand(f flags) *generateCommand {
 	}
 }
 
-func (p *generateCommand) Command() *cli.Command {
+func (p *GenerateCommand) Command() *cli.Command {
 	return &cli.Command{
 		Name:        "generate",
 		Description: "generate records",
@@ -72,7 +78,7 @@ func (p *generateCommand) Command() *cli.Command {
 	}
 }
 
-func (p *generateCommand) Init(ctx *cli.Context) error {
+func (p *GenerateCommand) Init(ctx *cli.Context) error {
 	base, err := NewBase(ctx, p.flags.flags)
 	if err != nil {
 		return cli.Exit(err, 2)
@@ -87,7 +93,7 @@ func (p *generateCommand) Init(ctx *cli.Context) error {
 	return nil
 }
 
-func (p *generateCommand) GenerateRecords(ctx *cli.Context) error {
+func (p *GenerateCommand) GenerateRecords(ctx *cli.Context) error {
 	s, err := p.schemaLoader.GetSchema(ctx, p.flags.schema)
 	if err != nil {
 		return err
@@ -102,22 +108,38 @@ func (p *generateCommand) GenerateRecords(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("generate records: %w", err)
 	}
-	return dumpRecordsCSV(records)
+	return p.DumpRecords(records, p.flags.outputPath.Get(ctx))
 }
 
-func (p *generateCommand) DefaultsCommand() *cli.Command {
-	defaultChecks := &cli.StringSliceFlag{
-		Name:    "names",
-		Aliases: []string{"n"},
-		Usage:   `--names 'my_schema\.my_table.*,other_schema\..*,.*'`,
+func (p *GenerateCommand) DefaultsCommand() *cli.Command {
+	var tableRegs []*regexp.Regexp
+	tablesPatterns := &cli.StringSliceFlag{
+		Name:    "pattern",
+		Aliases: []string{"p"},
+		Usage:   `-p 'my_schema\.my_table.*' -p 'other_schema\..*' -p '.*'`,
+		Action: func(ctx *cli.Context, names []string) error {
+			for _, name := range names {
+				re, err := regexp.Compile(name)
+				if err != nil {
+					return err
+				}
+				tableRegs = append(tableRegs, re)
+			}
+			return nil
+		},
 	}
-
+	tablesNames := &cli.StringSliceFlag{
+		Name:    "name",
+		Aliases: []string{"n"},
+		Usage:   `-n my_schema.my_table -n other_schema.other_table`,
+	}
 	return &cli.Command{
 		Name:        "default",
 		Description: "generate default partial records",
 		Flags: append(
 			p.flags.Set(),
-			defaultChecks,
+			tablesNames,
+			tablesPatterns,
 		),
 		Action: func(ctx *cli.Context) error {
 			s, err := p.schemaLoader.GetSchema(ctx, p.flags.schema)
@@ -125,57 +147,109 @@ func (p *generateCommand) DefaultsCommand() *cli.Command {
 				return err
 			}
 
+			tables := mapset.NewThreadUnsafeSet[int]()
+
+			for _, re := range tableRegs {
+				for _, table := range s.Tables {
+					if re.MatchString(table.String()) {
+						tables.Add(table.OID())
+					}
+				}
+			}
+			for _, name := range tablesNames.Get(ctx) {
+				for _, table := range s.Tables {
+					if strings.EqualFold(name, table.String()) {
+						tables.Add(table.OID())
+					}
+				}
+			}
+			p.log.Debug("got table oids", zap.Ints("tables", tables.ToSlice()))
+
 			gen, err := generate.New(p.log, s.Tables)
 			if err != nil {
-				return err
+				return fmt.Errorf("create generator: %w", err)
 			}
 
-			checks := gen.GetDefaultChecks()
+			checks, err := gen.GetDefaultChecks(tables.ToSlice())
+			if err != nil {
+				return fmt.Errorf("generate default checks: %w", err)
+			}
 
-			return dumpChecksCSV(checks)
+			return p.DumpPartial(checks, p.flags.outputPath.Get(ctx))
 		},
 	}
 }
 
-func dumpChecksCSV(checks map[string]generate.PartialRecords) error {
-	for tableName, tableChecks := range checks {
-		var lastColumns string
-
-		fmt.Println("\n\nDUMP TABLE ", tableName)
-		cw := csv.NewWriter(os.Stdout)
-		for _, record := range tableChecks {
-			if currColumns := strings.Join(record.Columns, ","); currColumns != lastColumns {
-				lastColumns = currColumns
-				if err := cw.Write(record.Columns); err != nil {
-					return err
-				}
-			}
-			if err := cw.Write(record.Values); err != nil {
-				return err
-			}
-		}
-		cw.Flush()
-		if err := cw.Error(); err != nil {
+func (p *GenerateCommand) DumpRecords(records map[int]generate.Records, dumpdir string) error {
+	for _, tableRecords := range records {
+		err := dumpToFile(p.log, dumpdir, tableRecords.Table.String(), tableRecords, p.dumpRecordsCSV)
+		if err != nil {
+			err = fmt.Errorf("dump partial records for table %q: %w", tableRecords.Table, err)
+			p.log.Error(err.Error())
 			return err
 		}
-		fmt.Println("DUMP TABLE FINISHED", tableName)
 	}
 
 	return nil
 }
 
-func dumpRecordsCSV(records map[string]*generate.Records) error {
-	for tableName, tableRecords := range records {
-		fmt.Println("\n\nDUMP TABLE ", tableName)
-		cw := csv.NewWriter(os.Stdout)
-		if err := cw.Write(tableRecords.Columns); err != nil {
+func (p *GenerateCommand) DumpPartial(checks []generate.PartialRecords, dumpdir string) error {
+	for _, partial := range checks {
+		err := dumpToFile(p.log, dumpdir, partial.Table.String(), partial, p.dumpPartialCSV)
+		if err != nil {
+			err = fmt.Errorf("dump partial records for table %q: %w", partial.Table, err)
+			p.log.Error(err.Error())
 			return err
 		}
-		if err := cw.WriteAll(tableRecords.Values); err != nil {
-			return err
+	}
+	return nil
+}
+
+func (p *GenerateCommand) dumpPartialCSV(w io.Writer, precords generate.PartialRecords) error {
+	var conv CSVConverter
+	return csv.NewWriter(w).WriteAll(conv.ConvertPartialRecords(precords))
+}
+
+func (p *GenerateCommand) dumpRecordsCSV(w io.Writer, records generate.Records) error {
+	var conv CSVConverter
+	return csv.NewWriter(w).WriteAll(conv.ConvertRecords(records))
+}
+
+func dumpToFile[T any](
+	log *zap.Logger,
+	dumpdir string,
+	tableName string,
+	data T,
+	dumpFunc func(w io.Writer, data T) error,
+) (err error) {
+	log = log.WithOptions(zap.AddCallerSkip(1))
+	dumpfile := filepath.Join(dumpdir, tableName+".csv")
+	if dumpdir == "" {
+		dumpfile = "stdout"
+	}
+	defer func() {
+		log.Info("dumped partial records for table",
+			zap.String("table", tableName),
+			zap.String("dumpfile", dumpfile),
+			zap.Error(err),
+		)
+	}()
+
+	var out io.Writer
+	if dumpdir == "" {
+		out = os.Stdout
+	} else {
+		file, err := os.Create(dumpfile)
+		if err != nil {
+			err := fmt.Errorf("create output file for default checks: %w", err)
+			log.Error(err.Error())
+			return cli.Exit("", 5)
 		}
-		fmt.Println("DUMP TABLE FINISHED", tableName)
+		defer func() {
+			err = errors.Join(err, file.Close())
+		}()
+		out = file
 	}
 
-	return nil
+	return dumpFunc(out, data)
 }
