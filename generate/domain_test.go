@@ -10,7 +10,7 @@ import (
 
 func TestIntDomain(t *testing.T) {
 	id := &IntDomain{}
-	id.ResetWith(2)
+	id.Init(2)
 
 	// Test Next and Value methods for the first few values
 	expectedValues := []string{"0", "1", "-1", "2", "-2"}
@@ -30,16 +30,16 @@ func TestIntDomain(t *testing.T) {
 	assert.Equal(t, 1000, id.top, "Expected Reset to reset the IntDomain struct")
 	assert.Equal(t, 0, id.value, "Expected Reset to reset the IntDomain struct")
 
-	// Test ResetWith method
-	id.ResetWith(10)
-	assert.Equal(t, 0, id.counter, "Expected ResetWith to reset the IntDomain struct")
-	assert.Equal(t, 10, id.top, "Expected ResetWith to set the top value correctly")
-	assert.Equal(t, 0, id.value, "Expected ResetWith to reset the IntDomain struct")
+	// Test Init method
+	id.Init(10)
+	assert.Equal(t, 0, id.counter, "Expected Init to reset the IntDomain struct")
+	assert.Equal(t, 10, id.top, "Expected Init to set the top value correctly")
+	assert.Equal(t, 0, id.value, "Expected Init to reset the IntDomain struct")
 }
 
 func TestTimeDomain(t *testing.T) {
 	td := &TimeDomain{}
-	td.ResetWith(time.Date(2023, 1, 3, 0, 0, 0, 0, time.UTC), 5)
+	td.Init(time.Date(2023, 1, 3, 0, 0, 0, 0, time.UTC), 5)
 
 	// Test Next and Value methods for the first five values
 	expectedValues := []string{
@@ -68,7 +68,7 @@ func TestTimeDomain(t *testing.T) {
 
 func TestFloatDomain(t *testing.T) {
 	fd := &FloatDomain{}
-	fd.ResetWith(0.5, 3.0)
+	fd.Init(0.5, 3.0)
 
 	// Test Next and Value methods for the first few values
 	expectedValues := []string{

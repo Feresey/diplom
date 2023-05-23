@@ -5,30 +5,32 @@ import (
 	"sort"
 )
 
+var ErrCycle = errors.New("graph contains a cycle")
+
 type Graph struct {
 	// map[текущая_таблица][таблицы_для_которых_текущая_это_внешняя]внешняя_таблица
-	Graph map[int]map[int]*Table
+	Graph map[string][]string
 }
 
-func NewGraph(tables map[int]*Table) *Graph {
-	g := &Graph{}
-
-	g.Graph = make(map[int]map[int]*Table, len(tables))
-	for _, table := range tables {
-		foreignTables := make(map[int]*Table, len(table.ForeignKeys))
-		g.Graph[table.OID()] = foreignTables
-		for _, ref := range table.ReferencedBy {
-			foreignTables[ref.Table.OID()] = ref.Table
+func (s *Schema) NewGraph() *Graph {
+	graph := make(map[string][]string, len(s.Tables))
+	for _, table := range s.Tables {
+		refs := make([]string, 0, len(table.ReferencedBy))
+		for ref := range table.ReferencedBy {
+			refs = append(refs, ref)
 		}
+		graph[table.String()] = refs
 	}
-	return g
+	return &Graph{
+		Graph: graph,
+	}
 }
 
-func (g *Graph) GetDepth() map[int]int {
+func (g *Graph) GetDepth() map[string]int {
 	// Initialize indegrees
-	inDegrees := make(map[int]int)
+	inDegrees := make(map[string]int)
 	for parent, neighbors := range g.Graph {
-		for neighbor := range neighbors {
+		for _, neighbor := range neighbors {
 			if parent == neighbor {
 				// ссылка сама на себя не считается циклом
 				continue
@@ -39,22 +41,22 @@ func (g *Graph) GetDepth() map[int]int {
 	return inDegrees
 }
 
-func (g *Graph) TopologicalSort() ([]int, error) {
+func (g *Graph) TopologicalSort() ([]string, error) {
 	// Create a slice to store the result
-	result := make([]int, 0, len(g.Graph))
+	result := make([]string, 0, len(g.Graph))
 
 	// Initialize indegrees
 	inDegrees := g.GetDepth()
 
 	// sorted order
-	keys := make([]int, 0, len(g.Graph))
+	keys := make([]string, 0, len(g.Graph))
 	for tableOID := range g.Graph {
 		keys = append(keys, tableOID)
 	}
-	sort.Ints(keys)
+	sort.Strings(keys)
 
 	// Add all nodes with no incoming edges to the queue
-	queue := make([]int, 0, len(g.Graph))
+	queue := make([]string, 0, len(g.Graph))
 	for _, node := range keys {
 		inDegree := inDegrees[node]
 		if inDegree == 0 {
@@ -69,23 +71,26 @@ func (g *Graph) TopologicalSort() ([]int, error) {
 		queue = queue[1:]
 		result = append(result, node)
 
-		var enqueue []int
+		var enqueue []string
 		// Decrement the indegrees of all neighbors
-		for neighbor := range g.Graph[node] {
+		for _, neighbor := range g.Graph[node] {
 			inDegrees[neighbor]--
 			if inDegrees[neighbor] == 0 {
 				enqueue = append(enqueue, neighbor)
 			}
 		}
 		// sorted order
-		sort.Ints(enqueue)
+		sort.Strings(enqueue)
 		queue = append(queue, enqueue...)
 	}
 
 	// Check if we encountered a cycle
 	if len(result) != len(g.Graph) {
-		return nil, errors.New("the graph contains a cycle")
+		return nil, ErrCycle
 	}
 
+	if len(result) == 0 {
+		result = nil
+	}
 	return result, nil
 }

@@ -12,8 +12,8 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 
+	"github.com/Feresey/mtest/db"
 	"github.com/Feresey/mtest/parse"
-	"github.com/Feresey/mtest/parse/queries"
 	"github.com/Feresey/mtest/schema"
 )
 
@@ -127,7 +127,7 @@ func (p *SchemaLoader) parseDB(ctx *cli.Context) (s *schema.Schema, err error) {
 	parser := parse.NewParser(p.conn, p.log)
 	s, err = parser.LoadSchema(ctx.Context, p.cnf.Parser)
 	if err != nil {
-		var pErr queries.Error
+		var pErr db.Error
 		if errors.As(err, &pErr) {
 			p.log.Error(pErr.Pretty())
 		}

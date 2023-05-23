@@ -7,7 +7,11 @@ import (
 	"strings"
 
 	"github.com/Feresey/mtest/schema"
+	mapset "github.com/deckarep/golang-set/v2"
+	"go.uber.org/zap"
 )
+
+const pgCatalogPrefix = "pg_catalog."
 
 // var BaseTypes = map[string]struct{}{
 // 	"bool": {},
@@ -80,86 +84,90 @@ var Checks = map[string][]string{
 	},
 }
 
-// GetDefaultChecks генерирует дефолтные проверки для всех таблиц.
-func (g *Generator) GetDefaultChecks(tables []int) ([]PartialRecords, error) {
-	res := make([]PartialRecords, 0, len(g.order))
-	for _, tableOID := range tables {
-		table, ok := g.tables[tableOID]
-		if !ok {
-			return nil, fmt.Errorf("table with oid %d not found", tableOID)
-		}
-		checks := g.getDefaultTableChecks(table)
-		// TODO configure mergeChecks
-		records := g.transformChecks(table, checks, true)
-		res = append(res, records)
+type ColumnChecks struct {
+	Values []string
+}
+
+func (c *ColumnChecks) AddValues(vals ...string) {
+	c.Values = append(c.Values, vals...)
+}
+
+func (c *ColumnChecks) AddValuesProcess(f func(string) string, vals ...string) {
+	for _, v := range vals {
+		c.Values = append(c.Values, f(v))
 	}
-	return res, nil
+}
+
+// GetDefaultChecks генерирует дефолтные проверки для всех таблиц.
+func (g *Generator) GetDefaultChecks(table schema.Table) Records {
+	checks := g.getDefaultTableChecks(table)
+	// TODO configure mergeChecks
+	records := g.transformChecks(checks, true)
+	return records
 }
 
 // getDefaultTableChecks генерирует дефолтные проверки для указанной таблицы.
-func (g *Generator) getDefaultTableChecks(table *schema.Table) map[int]*ColumnChecks {
-	checks := make(map[int]*ColumnChecks, len(table.Columns))
+func (g *Generator) getDefaultTableChecks(table schema.Table) map[string]ColumnChecks {
+	checks := make(map[string]ColumnChecks, len(table.Columns))
 
-	foreignColumns := make(map[string]struct{}, len(table.Columns))
+	foreignColumns := mapset.NewThreadUnsafeSet[string]()
 	for _, fk := range table.ForeignKeys {
-		for _, col := range fk.Foreign.Columns {
-			foreignColumns[col.Name] = struct{}{}
-		}
+		foreignColumns.Append(fk.Constraint.Columns...)
 	}
 
 	for _, col := range table.Columns {
-		check := &ColumnChecks{}
-		attr := col.Attributes
-
-		if !attr.NotNullable {
-			check.AddValues("NULL")
-		}
-
-		// Если тип не является встроенным в postgresql, то я его не обрабатываю.
-		if col.Type.TypeName.Schema != "pg_catalog" {
-			continue
-		}
-		checks[col.ColNum] = check
-
-		// Для FK колонок нельзя делать обычные проверки на значения, т.к. они зависят от других таблиц.
-		if _, ok := foreignColumns[col.Name]; ok {
-			continue
-		}
-		g.getTypeChecks(check, col.Type)
-
-		// TODO numeric min max
-		if col.Attributes.IsNumeric && col.Attributes.NumericPrecision == 0 {
-			check.AddValues("'infinity'::NUMERIC", "'-infinity'::NUMERIC")
-		}
-
-		// Только если это текстовый тип и он имеет аттрибут CharMaxLength, то надо сгенерить строчку максимальной длины.
-		// TODO нужно ли проверять на текстовость?
-		if attr.HasCharMaxLength {
-			check.AddValuesProcess(
-				func(s string) string { return fmt.Sprintf("'%s'", s) },
-				strings.Repeat(" ", attr.CharMaxLength),
-				strings.Repeat("0", attr.CharMaxLength),
-			)
-		}
+		checks[col.Name] = g.makeChecks(col, foreignColumns)
 	}
 
 	return checks
 }
 
-func (g *Generator) transformChecks(
-	table *schema.Table,
-	checks map[int]*ColumnChecks,
-	mergeChecks bool,
-) PartialRecords {
-	res := PartialRecords{
-		Table: table,
+func (g *Generator) makeChecks(col schema.Column, foreignCols mapset.Set[string]) ColumnChecks {
+	var check ColumnChecks
+	attr := col.Attributes
+
+	if !attr.NotNullable {
+		check.AddValues("NULL")
 	}
 
+	// Если тип не является встроенным в postgresql, то я его не обрабатываю.
+	if !strings.HasPrefix(col.Type.String(), pgCatalogPrefix) {
+		return check
+	}
+
+	// Для FK колонок нельзя делать обычные проверки на значения, т.к. они зависят от других таблиц.
+	if foreignCols.Contains(col.Name) {
+		return check
+	}
+	g.getTypeChecks(&check, col.Type)
+
+	// TODO numeric min max
+	if col.Attributes.IsNumeric && col.Attributes.NumericPrecision == 0 {
+		check.AddValues("'infinity'::NUMERIC", "'-infinity'::NUMERIC")
+	}
+
+	// Только если это текстовый тип и он имеет аттрибут CharMaxLength, то надо сгенерить строчку максимальной длины.
+	// TODO нужно ли проверять на текстовость?
+	if attr.HasCharMaxLength {
+		check.AddValuesProcess(
+			func(s string) string { return fmt.Sprintf("'%s'", s) },
+			strings.Repeat(" ", attr.CharMaxLength),
+			strings.Repeat("0", attr.CharMaxLength),
+		)
+	}
+
+	return check
+}
+
+func (g *Generator) transformChecks(
+	checks map[string]ColumnChecks,
+	mergeChecks bool,
+) (res Records) {
 	// Объединение проверок отдельных колонок в частичные записи.
 	for colName, columnChecks := range checks {
 		for _, value := range columnChecks.Values {
-			pr := PartialRecord{
-				Columns: []int{colName},
+			pr := Record{
+				Columns: []string{colName},
 				Values:  []string{value},
 			}
 			if mergeChecks {
@@ -173,20 +181,25 @@ func (g *Generator) transformChecks(
 	return res
 }
 
-func (g *Generator) getTypeChecks(check *ColumnChecks, typ *schema.DBType) {
-	switch typ.Type {
+func (g *Generator) getTypeChecks(check *ColumnChecks, typ schema.DBType) {
+	switch typ.TypType() {
 	case schema.DataTypeBase:
-		g.baseTypesChecks(check, typ.TypeName.Name)
+		g.baseTypesChecks(check, strings.TrimPrefix(typ.String(), pgCatalogPrefix))
 	case schema.DataTypeArray:
 		// TODO нужно добавить кучу проверок на разные массивы, например для INT[][]:
 		// [None], [None, None], [[None]], [], [[1],[2]], [[1],[None]], [[None], [None]]
 		// dims := col.Attributes.ArrayDims
 	case schema.DataTypeEnum:
+		enum, ok := typ.(*schema.EnumType)
+		if !ok {
+			g.log.Error("schema.DBType.TypType() is Enum, but real type is not enum", zap.Stringer("type", typ))
+			return
+		}
 		check.AddValuesProcess(func(s string) string {
-			return fmt.Sprintf("'%s'::%s", s, typ.EnumType.TypeName.String())
-		}, typ.EnumType.Values...)
+			return fmt.Sprintf("'%s'::%s", s, enum.String())
+		}, enum.Values...)
 	case schema.DataTypeDomain:
-		g.getTypeChecks(check, typ.DomainType.ElemType)
+		g.getTypeChecks(check, typ.(*schema.DomainType).ElemType)
 	case schema.DataTypeComposite,
 		schema.DataTypeRange,
 		schema.DataTypeMultiRange,

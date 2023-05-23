@@ -67,6 +67,10 @@ output:
   sort-results: true
 
 issues:
+  exclude-rules:
+    - linters: [tagliatelle]
+      source: json:",
+
   # I found it strange to skip the errors, setting 0 to have all the results.
   max-issues-per-linter: 0
 

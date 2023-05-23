@@ -1,12 +1,3 @@
 dbconn: "postgresql://postgres:postgres@localhost:5432"
 parser:
-  # - pg_catalog
   - test
-  - public
-  - vuln
-  - scanner
-generator:
-  tables:
-    - table: test.users
-      checks: spare
-    # checks: merge

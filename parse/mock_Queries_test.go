@@ -5,7 +5,7 @@ package parse
 import (
 	context "context"
 
-	queries "github.com/Feresey/mtest/parse/queries"
+	query "github.com/Feresey/mtest/parse/query"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -22,25 +22,25 @@ func (_m *MockQueries) EXPECT() *MockQueries_Expecter {
 	return &MockQueries_Expecter{mock: &_m.Mock}
 }
 
-// Columns provides a mock function with given fields: _a0, _a1, _a2
-func (_m *MockQueries) Columns(_a0 context.Context, _a1 queries.Executor, _a2 []int) ([]queries.Column, error) {
-	ret := _m.Called(_a0, _a1, _a2)
+// Columns provides a mock function with given fields: ctx, exec, tables
+func (_m *MockQueries) Columns(ctx context.Context, exec query.Executor, tables []int) ([]query.Column, error) {
+	ret := _m.Called(ctx, exec, tables)
 
-	var r0 []queries.Column
+	var r0 []query.Column
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []int) ([]queries.Column, error)); ok {
-		return rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, query.Executor, []int) ([]query.Column, error)); ok {
+		return rf(ctx, exec, tables)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []int) []queries.Column); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, query.Executor, []int) []query.Column); ok {
+		r0 = rf(ctx, exec, tables)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]queries.Column)
+			r0 = ret.Get(0).([]query.Column)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, queries.Executor, []int) error); ok {
-		r1 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(1).(func(context.Context, query.Executor, []int) error); ok {
+		r1 = rf(ctx, exec, tables)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -54,49 +54,49 @@ type MockQueries_Columns_Call struct {
 }
 
 // Columns is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - _a1 queries.Executor
-//   - _a2 []int
-func (_e *MockQueries_Expecter) Columns(_a0 interface{}, _a1 interface{}, _a2 interface{}) *MockQueries_Columns_Call {
-	return &MockQueries_Columns_Call{Call: _e.mock.On("Columns", _a0, _a1, _a2)}
+//   - ctx context.Context
+//   - exec query.Executor
+//   - tables []int
+func (_e *MockQueries_Expecter) Columns(ctx interface{}, exec interface{}, tables interface{}) *MockQueries_Columns_Call {
+	return &MockQueries_Columns_Call{Call: _e.mock.On("Columns", ctx, exec, tables)}
 }
 
-func (_c *MockQueries_Columns_Call) Run(run func(_a0 context.Context, _a1 queries.Executor, _a2 []int)) *MockQueries_Columns_Call {
+func (_c *MockQueries_Columns_Call) Run(run func(ctx context.Context, exec query.Executor, tables []int)) *MockQueries_Columns_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(queries.Executor), args[2].([]int))
+		run(args[0].(context.Context), args[1].(query.Executor), args[2].([]int))
 	})
 	return _c
 }
 
-func (_c *MockQueries_Columns_Call) Return(_a0 []queries.Column, _a1 error) *MockQueries_Columns_Call {
+func (_c *MockQueries_Columns_Call) Return(_a0 []query.Column, _a1 error) *MockQueries_Columns_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockQueries_Columns_Call) RunAndReturn(run func(context.Context, queries.Executor, []int) ([]queries.Column, error)) *MockQueries_Columns_Call {
+func (_c *MockQueries_Columns_Call) RunAndReturn(run func(context.Context, query.Executor, []int) ([]query.Column, error)) *MockQueries_Columns_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Constraints provides a mock function with given fields: _a0, _a1, _a2
-func (_m *MockQueries) Constraints(_a0 context.Context, _a1 queries.Executor, _a2 []int) ([]queries.Constraint, error) {
-	ret := _m.Called(_a0, _a1, _a2)
+// Constraints provides a mock function with given fields: ctx, exec, tables
+func (_m *MockQueries) Constraints(ctx context.Context, exec query.Executor, tables []int) ([]query.Constraint, error) {
+	ret := _m.Called(ctx, exec, tables)
 
-	var r0 []queries.Constraint
+	var r0 []query.Constraint
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []int) ([]queries.Constraint, error)); ok {
-		return rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, query.Executor, []int) ([]query.Constraint, error)); ok {
+		return rf(ctx, exec, tables)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []int) []queries.Constraint); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, query.Executor, []int) []query.Constraint); ok {
+		r0 = rf(ctx, exec, tables)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]queries.Constraint)
+			r0 = ret.Get(0).([]query.Constraint)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, queries.Executor, []int) error); ok {
-		r1 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(1).(func(context.Context, query.Executor, []int) error); ok {
+		r1 = rf(ctx, exec, tables)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -110,49 +110,49 @@ type MockQueries_Constraints_Call struct {
 }
 
 // Constraints is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - _a1 queries.Executor
-//   - _a2 []int
-func (_e *MockQueries_Expecter) Constraints(_a0 interface{}, _a1 interface{}, _a2 interface{}) *MockQueries_Constraints_Call {
-	return &MockQueries_Constraints_Call{Call: _e.mock.On("Constraints", _a0, _a1, _a2)}
+//   - ctx context.Context
+//   - exec query.Executor
+//   - tables []int
+func (_e *MockQueries_Expecter) Constraints(ctx interface{}, exec interface{}, tables interface{}) *MockQueries_Constraints_Call {
+	return &MockQueries_Constraints_Call{Call: _e.mock.On("Constraints", ctx, exec, tables)}
 }
 
-func (_c *MockQueries_Constraints_Call) Run(run func(_a0 context.Context, _a1 queries.Executor, _a2 []int)) *MockQueries_Constraints_Call {
+func (_c *MockQueries_Constraints_Call) Run(run func(ctx context.Context, exec query.Executor, tables []int)) *MockQueries_Constraints_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(queries.Executor), args[2].([]int))
+		run(args[0].(context.Context), args[1].(query.Executor), args[2].([]int))
 	})
 	return _c
 }
 
-func (_c *MockQueries_Constraints_Call) Return(_a0 []queries.Constraint, _a1 error) *MockQueries_Constraints_Call {
+func (_c *MockQueries_Constraints_Call) Return(_a0 []query.Constraint, _a1 error) *MockQueries_Constraints_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockQueries_Constraints_Call) RunAndReturn(run func(context.Context, queries.Executor, []int) ([]queries.Constraint, error)) *MockQueries_Constraints_Call {
+func (_c *MockQueries_Constraints_Call) RunAndReturn(run func(context.Context, query.Executor, []int) ([]query.Constraint, error)) *MockQueries_Constraints_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Enums provides a mock function with given fields: _a0, _a1, _a2
-func (_m *MockQueries) Enums(_a0 context.Context, _a1 queries.Executor, _a2 []int) ([]queries.Enum, error) {
-	ret := _m.Called(_a0, _a1, _a2)
+// Enums provides a mock function with given fields: ctx, exec, enums
+func (_m *MockQueries) Enums(ctx context.Context, exec query.Executor, enums []int) ([]query.Enum, error) {
+	ret := _m.Called(ctx, exec, enums)
 
-	var r0 []queries.Enum
+	var r0 []query.Enum
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []int) ([]queries.Enum, error)); ok {
-		return rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, query.Executor, []int) ([]query.Enum, error)); ok {
+		return rf(ctx, exec, enums)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []int) []queries.Enum); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, query.Executor, []int) []query.Enum); ok {
+		r0 = rf(ctx, exec, enums)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]queries.Enum)
+			r0 = ret.Get(0).([]query.Enum)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, queries.Executor, []int) error); ok {
-		r1 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(1).(func(context.Context, query.Executor, []int) error); ok {
+		r1 = rf(ctx, exec, enums)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -166,49 +166,49 @@ type MockQueries_Enums_Call struct {
 }
 
 // Enums is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - _a1 queries.Executor
-//   - _a2 []int
-func (_e *MockQueries_Expecter) Enums(_a0 interface{}, _a1 interface{}, _a2 interface{}) *MockQueries_Enums_Call {
-	return &MockQueries_Enums_Call{Call: _e.mock.On("Enums", _a0, _a1, _a2)}
+//   - ctx context.Context
+//   - exec query.Executor
+//   - enums []int
+func (_e *MockQueries_Expecter) Enums(ctx interface{}, exec interface{}, enums interface{}) *MockQueries_Enums_Call {
+	return &MockQueries_Enums_Call{Call: _e.mock.On("Enums", ctx, exec, enums)}
 }
 
-func (_c *MockQueries_Enums_Call) Run(run func(_a0 context.Context, _a1 queries.Executor, _a2 []int)) *MockQueries_Enums_Call {
+func (_c *MockQueries_Enums_Call) Run(run func(ctx context.Context, exec query.Executor, enums []int)) *MockQueries_Enums_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(queries.Executor), args[2].([]int))
+		run(args[0].(context.Context), args[1].(query.Executor), args[2].([]int))
 	})
 	return _c
 }
 
-func (_c *MockQueries_Enums_Call) Return(_a0 []queries.Enum, _a1 error) *MockQueries_Enums_Call {
+func (_c *MockQueries_Enums_Call) Return(_a0 []query.Enum, _a1 error) *MockQueries_Enums_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockQueries_Enums_Call) RunAndReturn(run func(context.Context, queries.Executor, []int) ([]queries.Enum, error)) *MockQueries_Enums_Call {
+func (_c *MockQueries_Enums_Call) RunAndReturn(run func(context.Context, query.Executor, []int) ([]query.Enum, error)) *MockQueries_Enums_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Indexes provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *MockQueries) Indexes(_a0 context.Context, _a1 queries.Executor, _a2 []int, _a3 []int) ([]queries.Index, error) {
-	ret := _m.Called(_a0, _a1, _a2, _a3)
+// Indexes provides a mock function with given fields: ctx, exec, tables, constraints
+func (_m *MockQueries) Indexes(ctx context.Context, exec query.Executor, tables []int, constraints []int) ([]query.Index, error) {
+	ret := _m.Called(ctx, exec, tables, constraints)
 
-	var r0 []queries.Index
+	var r0 []query.Index
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []int, []int) ([]queries.Index, error)); ok {
-		return rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(0).(func(context.Context, query.Executor, []int, []int) ([]query.Index, error)); ok {
+		return rf(ctx, exec, tables, constraints)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []int, []int) []queries.Index); ok {
-		r0 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(0).(func(context.Context, query.Executor, []int, []int) []query.Index); ok {
+		r0 = rf(ctx, exec, tables, constraints)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]queries.Index)
+			r0 = ret.Get(0).([]query.Index)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, queries.Executor, []int, []int) error); ok {
-		r1 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(1).(func(context.Context, query.Executor, []int, []int) error); ok {
+		r1 = rf(ctx, exec, tables, constraints)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -222,50 +222,50 @@ type MockQueries_Indexes_Call struct {
 }
 
 // Indexes is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - _a1 queries.Executor
-//   - _a2 []int
-//   - _a3 []int
-func (_e *MockQueries_Expecter) Indexes(_a0 interface{}, _a1 interface{}, _a2 interface{}, _a3 interface{}) *MockQueries_Indexes_Call {
-	return &MockQueries_Indexes_Call{Call: _e.mock.On("Indexes", _a0, _a1, _a2, _a3)}
+//   - ctx context.Context
+//   - exec query.Executor
+//   - tables []int
+//   - constraints []int
+func (_e *MockQueries_Expecter) Indexes(ctx interface{}, exec interface{}, tables interface{}, constraints interface{}) *MockQueries_Indexes_Call {
+	return &MockQueries_Indexes_Call{Call: _e.mock.On("Indexes", ctx, exec, tables, constraints)}
 }
 
-func (_c *MockQueries_Indexes_Call) Run(run func(_a0 context.Context, _a1 queries.Executor, _a2 []int, _a3 []int)) *MockQueries_Indexes_Call {
+func (_c *MockQueries_Indexes_Call) Run(run func(ctx context.Context, exec query.Executor, tables []int, constraints []int)) *MockQueries_Indexes_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(queries.Executor), args[2].([]int), args[3].([]int))
+		run(args[0].(context.Context), args[1].(query.Executor), args[2].([]int), args[3].([]int))
 	})
 	return _c
 }
 
-func (_c *MockQueries_Indexes_Call) Return(_a0 []queries.Index, _a1 error) *MockQueries_Indexes_Call {
+func (_c *MockQueries_Indexes_Call) Return(_a0 []query.Index, _a1 error) *MockQueries_Indexes_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockQueries_Indexes_Call) RunAndReturn(run func(context.Context, queries.Executor, []int, []int) ([]queries.Index, error)) *MockQueries_Indexes_Call {
+func (_c *MockQueries_Indexes_Call) RunAndReturn(run func(context.Context, query.Executor, []int, []int) ([]query.Index, error)) *MockQueries_Indexes_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Tables provides a mock function with given fields: _a0, _a1, _a2
-func (_m *MockQueries) Tables(_a0 context.Context, _a1 queries.Executor, _a2 []queries.TablesPattern) ([]queries.Tables, error) {
-	ret := _m.Called(_a0, _a1, _a2)
+// Tables provides a mock function with given fields: ctx, exec, patterns
+func (_m *MockQueries) Tables(ctx context.Context, exec query.Executor, patterns []query.TablesPattern) ([]query.Table, error) {
+	ret := _m.Called(ctx, exec, patterns)
 
-	var r0 []queries.Tables
+	var r0 []query.Table
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []queries.TablesPattern) ([]queries.Tables, error)); ok {
-		return rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, query.Executor, []query.TablesPattern) ([]query.Table, error)); ok {
+		return rf(ctx, exec, patterns)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []queries.TablesPattern) []queries.Tables); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, query.Executor, []query.TablesPattern) []query.Table); ok {
+		r0 = rf(ctx, exec, patterns)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]queries.Tables)
+			r0 = ret.Get(0).([]query.Table)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, queries.Executor, []queries.TablesPattern) error); ok {
-		r1 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(1).(func(context.Context, query.Executor, []query.TablesPattern) error); ok {
+		r1 = rf(ctx, exec, patterns)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -279,49 +279,49 @@ type MockQueries_Tables_Call struct {
 }
 
 // Tables is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - _a1 queries.Executor
-//   - _a2 []queries.TablesPattern
-func (_e *MockQueries_Expecter) Tables(_a0 interface{}, _a1 interface{}, _a2 interface{}) *MockQueries_Tables_Call {
-	return &MockQueries_Tables_Call{Call: _e.mock.On("Tables", _a0, _a1, _a2)}
+//   - ctx context.Context
+//   - exec query.Executor
+//   - patterns []query.TablesPattern
+func (_e *MockQueries_Expecter) Tables(ctx interface{}, exec interface{}, patterns interface{}) *MockQueries_Tables_Call {
+	return &MockQueries_Tables_Call{Call: _e.mock.On("Tables", ctx, exec, patterns)}
 }
 
-func (_c *MockQueries_Tables_Call) Run(run func(_a0 context.Context, _a1 queries.Executor, _a2 []queries.TablesPattern)) *MockQueries_Tables_Call {
+func (_c *MockQueries_Tables_Call) Run(run func(ctx context.Context, exec query.Executor, patterns []query.TablesPattern)) *MockQueries_Tables_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(queries.Executor), args[2].([]queries.TablesPattern))
+		run(args[0].(context.Context), args[1].(query.Executor), args[2].([]query.TablesPattern))
 	})
 	return _c
 }
 
-func (_c *MockQueries_Tables_Call) Return(_a0 []queries.Tables, _a1 error) *MockQueries_Tables_Call {
+func (_c *MockQueries_Tables_Call) Return(_a0 []query.Table, _a1 error) *MockQueries_Tables_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockQueries_Tables_Call) RunAndReturn(run func(context.Context, queries.Executor, []queries.TablesPattern) ([]queries.Tables, error)) *MockQueries_Tables_Call {
+func (_c *MockQueries_Tables_Call) RunAndReturn(run func(context.Context, query.Executor, []query.TablesPattern) ([]query.Table, error)) *MockQueries_Tables_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Types provides a mock function with given fields: _a0, _a1, _a2
-func (_m *MockQueries) Types(_a0 context.Context, _a1 queries.Executor, _a2 []int) ([]queries.Type, error) {
-	ret := _m.Called(_a0, _a1, _a2)
+// Types provides a mock function with given fields: ctx, exec, types
+func (_m *MockQueries) Types(ctx context.Context, exec query.Executor, types []int) ([]query.Type, error) {
+	ret := _m.Called(ctx, exec, types)
 
-	var r0 []queries.Type
+	var r0 []query.Type
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []int) ([]queries.Type, error)); ok {
-		return rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, query.Executor, []int) ([]query.Type, error)); ok {
+		return rf(ctx, exec, types)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, queries.Executor, []int) []queries.Type); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, query.Executor, []int) []query.Type); ok {
+		r0 = rf(ctx, exec, types)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]queries.Type)
+			r0 = ret.Get(0).([]query.Type)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, queries.Executor, []int) error); ok {
-		r1 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(1).(func(context.Context, query.Executor, []int) error); ok {
+		r1 = rf(ctx, exec, types)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -335,26 +335,26 @@ type MockQueries_Types_Call struct {
 }
 
 // Types is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - _a1 queries.Executor
-//   - _a2 []int
-func (_e *MockQueries_Expecter) Types(_a0 interface{}, _a1 interface{}, _a2 interface{}) *MockQueries_Types_Call {
-	return &MockQueries_Types_Call{Call: _e.mock.On("Types", _a0, _a1, _a2)}
+//   - ctx context.Context
+//   - exec query.Executor
+//   - types []int
+func (_e *MockQueries_Expecter) Types(ctx interface{}, exec interface{}, types interface{}) *MockQueries_Types_Call {
+	return &MockQueries_Types_Call{Call: _e.mock.On("Types", ctx, exec, types)}
 }
 
-func (_c *MockQueries_Types_Call) Run(run func(_a0 context.Context, _a1 queries.Executor, _a2 []int)) *MockQueries_Types_Call {
+func (_c *MockQueries_Types_Call) Run(run func(ctx context.Context, exec query.Executor, types []int)) *MockQueries_Types_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(queries.Executor), args[2].([]int))
+		run(args[0].(context.Context), args[1].(query.Executor), args[2].([]int))
 	})
 	return _c
 }
 
-func (_c *MockQueries_Types_Call) Return(_a0 []queries.Type, _a1 error) *MockQueries_Types_Call {
+func (_c *MockQueries_Types_Call) Return(_a0 []query.Type, _a1 error) *MockQueries_Types_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockQueries_Types_Call) RunAndReturn(run func(context.Context, queries.Executor, []int) ([]queries.Type, error)) *MockQueries_Types_Call {
+func (_c *MockQueries_Types_Call) RunAndReturn(run func(context.Context, query.Executor, []int) ([]query.Type, error)) *MockQueries_Types_Call {
 	_c.Call.Return(run)
 	return _c
 }

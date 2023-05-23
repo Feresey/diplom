@@ -1,4 +1,4 @@
-package queries
+package query
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 
 type Queries struct{}
 
-type Tables struct {
+type Table struct {
 	OID    int
 	Schema string
 	Table  string
@@ -39,7 +39,7 @@ func (q *queryBuiler) Append(query string, args ...any) {
 	q.args = append(q.args, args...)
 }
 
-func (Queries) Tables(ctx context.Context, exec Executor, p []TablesPattern) ([]Tables, error) {
+func (Queries) Tables(ctx context.Context, exec Executor, p []TablesPattern) ([]Table, error) {
 	const queryTablesSQL = `-- list tables
 SELECT
 	c.oid::INT AS table_oid,
@@ -68,7 +68,7 @@ WHERE
 
 	return QueryAll(
 		ctx, exec,
-		func(scan pgx.Rows, v *Tables) error {
+		func(scan pgx.Rows, v *Table) error {
 			return scan.Scan(
 				&v.OID,
 				&v.Schema,

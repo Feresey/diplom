@@ -11,8 +11,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/urfave/cli/v2"
 
+	"github.com/Feresey/mtest/db"
 	"github.com/Feresey/mtest/parse"
-	"github.com/Feresey/mtest/parse/queries"
 	"github.com/Feresey/mtest/schema"
 )
 
@@ -87,7 +87,7 @@ func (p *ParseCommand) Run(ctx *cli.Context) error {
 	parser := parse.NewParser(p.conn, p.log)
 	s, err := parser.LoadSchema(ctx.Context, p.cnf.Parser)
 	if err != nil {
-		var pErr queries.Error
+		var pErr db.Error
 		if errors.As(err, &pErr) {
 			println(pErr.Pretty())
 		}
@@ -95,8 +95,8 @@ func (p *ParseCommand) Run(ctx *cli.Context) error {
 	}
 	p.log.Info("schema parsed")
 
-	g := schema.NewGraph(s.Tables)
-	if _, err := g.TopologicalSort(); err != nil {
+	graph := s.NewGraph()
+	if _, err := graph.TopologicalSort(); err != nil {
 		return fmt.Errorf("try to determine tables order: %w", err)
 	}
 

@@ -32,7 +32,7 @@ func (s *Schema) Dump(w io.Writer, tplName TemplateName) error {
 			Graph  *Graph
 		}{
 			Schema: s,
-			Graph:  NewGraph(s.Tables),
+			Graph:  s.NewGraph(),
 		}
 	default:
 		return fmt.Errorf("undefined template name: %s", tplName)
@@ -69,7 +69,7 @@ func dump(w io.Writer, tplName TemplateName, data any) error {
 			},
 			"isFK": func(t *Table, col *Column) bool {
 				for _, fk := range t.ForeignKeys {
-					for colnum := range fk.Foreign.Columns {
+					for colnum := range fk.Constraint.Columns {
 						if colnum == col.ColNum {
 							return true
 						}

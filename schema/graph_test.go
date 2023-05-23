@@ -10,177 +10,128 @@ import (
 func TestTopologicalSort(t *testing.T) {
 	tables := []struct {
 		name     string
-		graph    map[int]map[int]*Table
-		expected []int
+		graph    map[string][]string
+		expected []string
+		wantErr  error
 	}{
 		{
 			"Single Table",
-			map[int]map[int]*Table{
-				1: {},
+			map[string][]string{
+				"1": nil,
 			},
-			[]int{1},
+			[]string{"1"},
+			nil,
 		},
 		{
 			"No Tables",
-			map[int]map[int]*Table{},
-			[]int{},
+			nil,
+			nil,
+			nil,
 		},
 		{
 			"No Relationships",
-			map[int]map[int]*Table{
-				1: {},
-				2: {},
+			map[string][]string{
+				"1": nil,
+				"2": nil,
 			},
-			[]int{1, 2},
+			[]string{"1", "2"},
+			nil,
 		},
 		{
 			"Simple Graph with One Cycle",
-			map[int]map[int]*Table{
-				1: {
-					2: nil,
-					3: nil,
+			map[string][]string{
+				"1": {"2", "3"},
+				"2": {
+					"1", // This is the cycle
+					"4",
 				},
-				2: {
-					1: nil, // This is the cycle
-					4: nil,
-				},
-				3: {
-					4: nil,
-				},
-				4: {},
+				"3": {"4"},
+				"4": {},
 			},
 			nil,
+			ErrCycle,
 		},
 		{
 			"Simple Graph with Two Cycles",
-			map[int]map[int]*Table{
-				1: {
-					2: nil,
-					3: nil,
+			map[string][]string{
+				"1": {"2", "3"},
+				"2": {"4"},
+				"3": {"2", "4"},
+				"4": {
+					"1", // This is the first cycle
+					"5",
 				},
-				2: {
-					4: nil,
-				},
-				3: {
-					2: nil,
-					4: nil,
-				},
-				4: {
-					1: nil, // This is the first cycle
-					5: nil,
-				},
-				5: {
-					4: nil, // This is the second cycle
+				"5": {
+					"4", // This is the second cycle
 				},
 			},
 			nil,
+			ErrCycle,
 		},
 		{
 			"Graph with All Tables Connected to One",
-			map[int]map[int]*Table{
-				1: {
-					2: nil,
-					3: nil,
-					4: nil,
-				},
-				2: {
-					3: nil,
-					4: nil,
-				},
-				3: {
-					4: nil,
-				},
-				4: {},
+			map[string][]string{
+				"1": {"2", "3", "4"},
+				"2": {"3", "4"},
+				"3": {"4"},
+				"4": {},
 			},
-			[]int{1, 2, 3, 4},
-		},
-		{
-			"Graph with Tables Connected in a Chain",
-			map[int]map[int]*Table{
-				1: {
-					2: nil,
-				},
-				2: {
-					3: nil,
-				},
-				3: {
-					4: nil,
-				},
-				4: {},
-			},
-			[]int{1, 2, 3, 4},
-		},
-		{
-			"Graph with Multiple Independent Cycles",
-			map[int]map[int]*Table{
-				1: {
-					2: nil,
-					3: nil,
-				},
-				2: {
-					4: nil,
-				},
-				3: {
-					5: nil,
-				},
-				4: {
-					1: nil,
-				},
-				5: {
-					3: nil,
-				},
-			},
+			[]string{"1", "2", "3", "4"},
 			nil,
 		},
 		{
-			"Graph with Self-Referencing Table",
-			map[int]map[int]*Table{
-				1: {
-					1: nil,
-				},
+			"Graph with Tables Connected in a Chain",
+			map[string][]string{
+				"1": {"2"},
+				"2": {"3"},
+				"3": {"4"},
+				"4": {},
 			},
-			[]int{1},
+			[]string{"1", "2", "3", "4"},
+			nil,
+		},
+		{
+			"Graph with Multiple Independent Cycles",
+			map[string][]string{
+				"1": {"2", "3"},
+				"2": {"4"},
+				"3": {"5"},
+				"4": {"1"},
+				"5": {"3"},
+			},
+			nil,
+			ErrCycle,
+		},
+		{
+			"Graph with Self-Referencing Table",
+			map[string][]string{
+				"1": {"1"},
+			},
+			[]string{"1"},
+			nil,
 		},
 		{
 			"Graph with Many Tables and Relationships",
-			map[int]map[int]*Table{
-				1: {
-					2: nil,
-					3: nil,
-				},
-				2: {
-					4: nil,
-					5: nil,
-				},
-				3: {
-					6: nil,
-					7: nil,
-				},
-				4: {
-					8: nil,
-					9: nil,
-				},
-				5: {
-					9: nil,
-				},
-				6: {
-					10: nil,
-					11: nil,
-				},
-				7: {
-					11: nil,
-				},
-				8:  {},
-				9:  {},
-				10: {},
-				11: {},
+			map[string][]string{
+				"1":  {"2", "3"},
+				"2":  {"4", "5"},
+				"3":  {"6", "7"},
+				"4":  {"8", "9"},
+				"5":  {"9"},
+				"6":  {"10", "11"},
+				"7":  {"11"},
+				"8":  {},
+				"9":  {},
+				"10": {},
+				"11": {},
 			},
-			[]int{
-				1, 2, 3,
-				4, 5, 6,
-				7, 8, 9,
-				10, 11,
+			[]string{
+				"1", "2", "3",
+				"4", "5", "6",
+				"7", "8", "9",
+				"10", "11",
 			},
+			nil,
 		},
 	}
 
@@ -191,8 +142,9 @@ func TestTopologicalSort(t *testing.T) {
 			}
 
 			result, err := g.TopologicalSort()
-			if tt.expected == nil {
-				require.Error(t, err, "result: %+#v", result)
+			if tt.wantErr != nil {
+				require.EqualError(t, err, tt.wantErr.Error())
+				require.Nil(t, result)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expected, result)

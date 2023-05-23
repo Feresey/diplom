@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	queries "github.com/Feresey/mtest/parse/queries"
+	"github.com/Feresey/mtest/parse/query"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -14,17 +14,17 @@ import (
 func TestParse(t *testing.T) {
 	tests := []*struct {
 		name    string
-		tables  []queries.Tables
-		columns []queries.Column
-		tc      []queries.Constraint
-		types   []queries.Type
-		indexes []queries.Index
+		tables  []query.Table
+		columns []query.Column
+		tc      []query.Constraint
+		types   []query.Type
+		indexes []query.Index
 	}{
 		{
 			name:    "simple",
-			tables:  []queries.Tables{{Table: "table", OID: 1}},
-			columns: []queries.Column{{ColumnNum: 1, ColumnName: "col", TableOID: 1, TypeOID: 2}},
-			types:   []queries.Type{{TypeOID: 2, TypeName: "type", TypeType: "b"}},
+			tables:  []query.Table{{Table: "table", OID: 1}},
+			columns: []query.Column{{ColumnNum: 1, ColumnName: "col", TableOID: 1, TypeOID: 2}},
+			types:   []query.Type{{TypeOID: 2, TypeName: "type", TypeType: "b"}},
 		},
 	}
 

@@ -1,0 +1,1886 @@
+{
+  "types": {
+    "1007": {
+      "type_name": {
+        "oid": 1007,
+        "schema": "pg_catalog",
+        "name": "_int4"
+      },
+      "type": "Array",
+      "array_type": {
+        "type_name": {
+          "oid": 1007,
+          "schema": "pg_catalog",
+          "name": "_int4"
+        },
+        "elem_type": {
+          "type_name": {
+            "oid": 23,
+            "schema": "pg_catalog",
+            "name": "int4"
+          },
+          "type": "Base"
+        }
+      }
+    },
+    "1043": {
+      "type_name": {
+        "oid": 1043,
+        "schema": "pg_catalog",
+        "name": "varchar"
+      },
+      "type": "Base"
+    },
+    "1114": {
+      "type_name": {
+        "oid": 1114,
+        "schema": "pg_catalog",
+        "name": "timestamp"
+      },
+      "type": "Base"
+    },
+    "17351": {
+      "type_name": {
+        "oid": 17351,
+        "schema": "test",
+        "name": "name_domain"
+      },
+      "type": "Domain",
+      "domain_type": {
+        "type_name": {
+          "oid": 17351,
+          "schema": "test",
+          "name": "name_domain"
+        },
+        "attributes": {
+          "not_nullable": true,
+          "has_char_max_length": true,
+          "char_max_length": 100
+        },
+        "elem_type": {
+          "type_name": {
+            "oid": 1043,
+            "schema": "pg_catalog",
+            "name": "varchar"
+          },
+          "type": "Base"
+        }
+      }
+    },
+    "17354": {
+      "type_name": {
+        "oid": 17354,
+        "schema": "test",
+        "name": "custom_type"
+      },
+      "type": "Composite",
+      "composite_type": {
+        "type_name": {
+          "oid": 17354,
+          "schema": "test",
+          "name": "custom_type"
+        }
+      }
+    },
+    "17356": {
+      "type_name": {
+        "oid": 17356,
+        "schema": "test",
+        "name": "status"
+      },
+      "type": "Enum",
+      "enum_type": {
+        "type_name": {
+          "oid": 17356,
+          "schema": "test",
+          "name": "status"
+        },
+        "values": [
+          "active",
+          "inactive"
+        ]
+      }
+    },
+    "23": {
+      "type_name": {
+        "oid": 23,
+        "schema": "pg_catalog",
+        "name": "int4"
+      },
+      "type": "Base"
+    },
+    "25": {
+      "type_name": {
+        "oid": 25,
+        "schema": "pg_catalog",
+        "name": "text"
+      },
+      "type": "Base"
+    },
+    "3904": {
+      "type_name": {
+        "oid": 3904,
+        "schema": "pg_catalog",
+        "name": "int4range"
+      },
+      "type": "Range",
+      "range_type": {
+        "type_name": {
+          "oid": 3904,
+          "schema": "pg_catalog",
+          "name": "int4range"
+        },
+        "elem_type": {
+          "type_name": {
+            "oid": 23,
+            "schema": "pg_catalog",
+            "name": "int4"
+          },
+          "type": "Base"
+        }
+      }
+    },
+    "700": {
+      "type_name": {
+        "oid": 700,
+        "schema": "pg_catalog",
+        "name": "float4"
+      },
+      "type": "Base"
+    },
+    "718": {
+      "type_name": {
+        "oid": 718,
+        "schema": "pg_catalog",
+        "name": "circle"
+      },
+      "type": "Base"
+    }
+  },
+  "array_types": {
+    "1007": {
+      "type_name": {
+        "oid": 1007,
+        "schema": "pg_catalog",
+        "name": "_int4"
+      },
+      "elem_type": {
+        "type_name": {
+          "oid": 23,
+          "schema": "pg_catalog",
+          "name": "int4"
+        },
+        "type": "Base"
+      }
+    }
+  },
+  "composite_types": {
+    "17354": {
+      "type_name": {
+        "oid": 17354,
+        "schema": "test",
+        "name": "custom_type"
+      }
+    }
+  },
+  "enum_types": {
+    "17356": {
+      "type_name": {
+        "oid": 17356,
+        "schema": "test",
+        "name": "status"
+      },
+      "values": [
+        "active",
+        "inactive"
+      ]
+    }
+  },
+  "range_types": {
+    "3904": {
+      "type_name": {
+        "oid": 3904,
+        "schema": "pg_catalog",
+        "name": "int4range"
+      },
+      "elem_type": {
+        "type_name": {
+          "oid": 23,
+          "schema": "pg_catalog",
+          "name": "int4"
+        },
+        "type": "Base"
+      }
+    }
+  },
+  "domain_types": {
+    "17351": {
+      "type_name": {
+        "oid": 17351,
+        "schema": "test",
+        "name": "name_domain"
+      },
+      "attributes": {
+        "not_nullable": true,
+        "has_char_max_length": true,
+        "char_max_length": 100
+      },
+      "elem_type": {
+        "type_name": {
+          "oid": 1043,
+          "schema": "pg_catalog",
+          "name": "varchar"
+        },
+        "type": "Base"
+      }
+    }
+  },
+  "tables": {
+    "17361": {
+      "name": {
+        "oid": 17361,
+        "schema": "test",
+        "name": "circles"
+      },
+      "columns": {
+        "1": {
+          "col_num": 1,
+          "name": "c",
+          "type": {
+            "type_name": {
+              "oid": 718,
+              "schema": "pg_catalog",
+              "name": "circle"
+            },
+            "type": "Base"
+          },
+          "attributes": {}
+        }
+      },
+      "constraints": [
+        17365
+      ],
+      "indexes": [
+        17364
+      ]
+    },
+    "17366": {
+      "name": {
+        "oid": 17366,
+        "schema": "test",
+        "name": "roles"
+      },
+      "columns": {
+        "1": {
+          "col_num": 1,
+          "name": "id",
+          "type": {
+            "type_name": {
+              "oid": 23,
+              "schema": "pg_catalog",
+              "name": "int4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "numeric_precision": 32
+          }
+        },
+        "2": {
+          "col_num": 2,
+          "name": "name",
+          "type": {
+            "type_name": {
+              "oid": 1043,
+              "schema": "pg_catalog",
+              "name": "varchar"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "has_char_max_length": true,
+            "char_max_length": 50
+          }
+        },
+        "3": {
+          "col_num": 3,
+          "name": "created_at",
+          "type": {
+            "type_name": {
+              "oid": 1114,
+              "schema": "pg_catalog",
+              "name": "timestamp"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "has_default": true,
+            "default": "now()"
+          }
+        },
+        "4": {
+          "col_num": 4,
+          "name": "updated_at",
+          "type": {
+            "type_name": {
+              "oid": 1114,
+              "schema": "pg_catalog",
+              "name": "timestamp"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "has_default": true,
+            "default": "now()"
+          }
+        }
+      },
+      "primary_key": {
+        "name": {
+          "oid": 17372,
+          "schema": "test",
+          "name": "roles_pkey"
+        },
+        "type": "PK",
+        "index": {
+          "name": {
+            "oid": 17371,
+            "schema": "test",
+            "name": "roles_pkey"
+          },
+          "columns": [
+            1
+          ],
+          "definition": "CREATE UNIQUE INDEX roles_pkey ON test.roles USING btree (id)",
+          "is_unique": true,
+          "is_primary": true
+        },
+        "definition": "PRIMARY KEY (id)",
+        "columns": [
+          1
+        ]
+      },
+      "referenced_by": [
+        17393
+      ],
+      "constraints": [
+        17372,
+        17374,
+        17376
+      ],
+      "indexes": [
+        17371,
+        17373,
+        17375
+      ]
+    },
+    "17378": {
+      "name": {
+        "oid": 17378,
+        "schema": "test",
+        "name": "users"
+      },
+      "columns": {
+        "1": {
+          "col_num": 1,
+          "name": "id",
+          "type": {
+            "type_name": {
+              "oid": 23,
+              "schema": "pg_catalog",
+              "name": "int4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "numeric_precision": 32,
+            "has_default": true,
+            "default": "nextval('test.users_id_seq'::regclass)"
+          }
+        },
+        "10": {
+          "col_num": 10,
+          "name": "role_name",
+          "type": {
+            "type_name": {
+              "oid": 1043,
+              "schema": "pg_catalog",
+              "name": "varchar"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "has_char_max_length": true,
+            "char_max_length": 50
+          }
+        },
+        "11": {
+          "col_num": 11,
+          "name": "price_range",
+          "type": {
+            "type_name": {
+              "oid": 3904,
+              "schema": "pg_catalog",
+              "name": "int4range"
+            },
+            "type": "Range",
+            "range_type": {
+              "type_name": {
+                "oid": 3904,
+                "schema": "pg_catalog",
+                "name": "int4range"
+              },
+              "elem_type": {
+                "type_name": {
+                  "oid": 23,
+                  "schema": "pg_catalog",
+                  "name": "int4"
+                },
+                "type": "Base"
+              }
+            }
+          },
+          "attributes": {
+            "not_nullable": true
+          }
+        },
+        "2": {
+          "col_num": 2,
+          "name": "name",
+          "type": {
+            "type_name": {
+              "oid": 17351,
+              "schema": "test",
+              "name": "name_domain"
+            },
+            "type": "Domain",
+            "domain_type": {
+              "type_name": {
+                "oid": 17351,
+                "schema": "test",
+                "name": "name_domain"
+              },
+              "attributes": {
+                "not_nullable": true,
+                "has_char_max_length": true,
+                "char_max_length": 100
+              },
+              "elem_type": {
+                "type_name": {
+                  "oid": 1043,
+                  "schema": "pg_catalog",
+                  "name": "varchar"
+                },
+                "type": "Base"
+              }
+            }
+          },
+          "attributes": {
+            "not_nullable": true,
+            "has_char_max_length": true,
+            "char_max_length": 100
+          }
+        },
+        "3": {
+          "col_num": 3,
+          "name": "email",
+          "type": {
+            "type_name": {
+              "oid": 1043,
+              "schema": "pg_catalog",
+              "name": "varchar"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "has_char_max_length": true,
+            "char_max_length": 100
+          }
+        },
+        "4": {
+          "col_num": 4,
+          "name": "age",
+          "type": {
+            "type_name": {
+              "oid": 23,
+              "schema": "pg_catalog",
+              "name": "int4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "numeric_precision": 32
+          }
+        },
+        "5": {
+          "col_num": 5,
+          "name": "full_name",
+          "type": {
+            "type_name": {
+              "oid": 17354,
+              "schema": "test",
+              "name": "custom_type"
+            },
+            "type": "Composite",
+            "composite_type": {
+              "type_name": {
+                "oid": 17354,
+                "schema": "test",
+                "name": "custom_type"
+              }
+            }
+          },
+          "attributes": {}
+        },
+        "6": {
+          "col_num": 6,
+          "name": "status",
+          "type": {
+            "type_name": {
+              "oid": 17356,
+              "schema": "test",
+              "name": "status"
+            },
+            "type": "Enum",
+            "enum_type": {
+              "type_name": {
+                "oid": 17356,
+                "schema": "test",
+                "name": "status"
+              },
+              "values": [
+                "active",
+                "inactive"
+              ]
+            }
+          },
+          "attributes": {}
+        },
+        "7": {
+          "col_num": 7,
+          "name": "created_at",
+          "type": {
+            "type_name": {
+              "oid": 1114,
+              "schema": "pg_catalog",
+              "name": "timestamp"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "has_default": true,
+            "default": "now()"
+          }
+        },
+        "8": {
+          "col_num": 8,
+          "name": "updated_at",
+          "type": {
+            "type_name": {
+              "oid": 1114,
+              "schema": "pg_catalog",
+              "name": "timestamp"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "has_default": true,
+            "default": "now()"
+          }
+        },
+        "9": {
+          "col_num": 9,
+          "name": "role_id",
+          "type": {
+            "type_name": {
+              "oid": 23,
+              "schema": "pg_catalog",
+              "name": "int4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "numeric_precision": 32
+          }
+        }
+      },
+      "primary_key": {
+        "name": {
+          "oid": 17390,
+          "schema": "test",
+          "name": "users_pkey"
+        },
+        "type": "PK",
+        "index": {
+          "name": {
+            "oid": 17389,
+            "schema": "test",
+            "name": "users_pkey"
+          },
+          "columns": [
+            1
+          ],
+          "definition": "CREATE UNIQUE INDEX users_pkey ON test.users USING btree (id)",
+          "is_unique": true,
+          "is_primary": true
+        },
+        "definition": "PRIMARY KEY (id)",
+        "columns": [
+          1
+        ]
+      },
+      "foreign_keys": {
+        "17393": {
+          "reference_columns": [
+            1,
+            2
+          ],
+          "reference": 17366
+        }
+      },
+      "referenced_by": [
+        17414
+      ],
+      "constraints": [
+        17384,
+        17385,
+        17386,
+        17390,
+        17392,
+        17393
+      ],
+      "indexes": [
+        17389,
+        17391
+      ]
+    },
+    "17398": {
+      "name": {
+        "oid": 17398,
+        "schema": "test",
+        "name": "products"
+      },
+      "columns": {
+        "1": {
+          "col_num": 1,
+          "name": "id",
+          "type": {
+            "type_name": {
+              "oid": 23,
+              "schema": "pg_catalog",
+              "name": "int4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "numeric_precision": 32
+          }
+        },
+        "2": {
+          "col_num": 2,
+          "name": "name",
+          "type": {
+            "type_name": {
+              "oid": 1043,
+              "schema": "pg_catalog",
+              "name": "varchar"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "has_char_max_length": true,
+            "char_max_length": 50
+          }
+        },
+        "3": {
+          "col_num": 3,
+          "name": "prices_1",
+          "type": {
+            "type_name": {
+              "oid": 1007,
+              "schema": "pg_catalog",
+              "name": "_int4"
+            },
+            "type": "Array",
+            "array_type": {
+              "type_name": {
+                "oid": 1007,
+                "schema": "pg_catalog",
+                "name": "_int4"
+              },
+              "elem_type": {
+                "type_name": {
+                  "oid": 23,
+                  "schema": "pg_catalog",
+                  "name": "int4"
+                },
+                "type": "Base"
+              }
+            }
+          },
+          "attributes": {
+            "not_nullable": true,
+            "array_dims": 1,
+            "numeric_precision": 32
+          }
+        },
+        "4": {
+          "col_num": 4,
+          "name": "prices_2",
+          "type": {
+            "type_name": {
+              "oid": 1007,
+              "schema": "pg_catalog",
+              "name": "_int4"
+            },
+            "type": "Array",
+            "array_type": {
+              "type_name": {
+                "oid": 1007,
+                "schema": "pg_catalog",
+                "name": "_int4"
+              },
+              "elem_type": {
+                "type_name": {
+                  "oid": 23,
+                  "schema": "pg_catalog",
+                  "name": "int4"
+                },
+                "type": "Base"
+              }
+            }
+          },
+          "attributes": {
+            "not_nullable": true,
+            "array_dims": 2,
+            "numeric_precision": 32
+          }
+        },
+        "5": {
+          "col_num": 5,
+          "name": "prices_3",
+          "type": {
+            "type_name": {
+              "oid": 1007,
+              "schema": "pg_catalog",
+              "name": "_int4"
+            },
+            "type": "Array",
+            "array_type": {
+              "type_name": {
+                "oid": 1007,
+                "schema": "pg_catalog",
+                "name": "_int4"
+              },
+              "elem_type": {
+                "type_name": {
+                  "oid": 23,
+                  "schema": "pg_catalog",
+                  "name": "int4"
+                },
+                "type": "Base"
+              }
+            }
+          },
+          "attributes": {
+            "not_nullable": true,
+            "array_dims": 2,
+            "numeric_precision": 32
+          }
+        },
+        "6": {
+          "col_num": 6,
+          "name": "discount_range",
+          "type": {
+            "type_name": {
+              "oid": 3904,
+              "schema": "pg_catalog",
+              "name": "int4range"
+            },
+            "type": "Range",
+            "range_type": {
+              "type_name": {
+                "oid": 3904,
+                "schema": "pg_catalog",
+                "name": "int4range"
+              },
+              "elem_type": {
+                "type_name": {
+                  "oid": 23,
+                  "schema": "pg_catalog",
+                  "name": "int4"
+                },
+                "type": "Base"
+              }
+            }
+          },
+          "attributes": {}
+        },
+        "7": {
+          "col_num": 7,
+          "name": "quantity_range",
+          "type": {
+            "type_name": {
+              "oid": 3904,
+              "schema": "pg_catalog",
+              "name": "int4range"
+            },
+            "type": "Range",
+            "range_type": {
+              "type_name": {
+                "oid": 3904,
+                "schema": "pg_catalog",
+                "name": "int4range"
+              },
+              "elem_type": {
+                "type_name": {
+                  "oid": 23,
+                  "schema": "pg_catalog",
+                  "name": "int4"
+                },
+                "type": "Base"
+              }
+            }
+          },
+          "attributes": {
+            "not_nullable": true
+          }
+        }
+      },
+      "primary_key": {
+        "name": {
+          "oid": 17405,
+          "schema": "test",
+          "name": "products_pkey"
+        },
+        "type": "PK",
+        "index": {
+          "name": {
+            "oid": 17404,
+            "schema": "test",
+            "name": "products_pkey"
+          },
+          "columns": [
+            1
+          ],
+          "definition": "CREATE UNIQUE INDEX products_pkey ON test.products USING btree (id)",
+          "is_unique": true,
+          "is_primary": true
+        },
+        "definition": "PRIMARY KEY (id)",
+        "columns": [
+          1
+        ]
+      },
+      "referenced_by": [
+        17419
+      ],
+      "constraints": [
+        17401,
+        17405
+      ],
+      "indexes": [
+        17404
+      ]
+    },
+    "17406": {
+      "name": {
+        "oid": 17406,
+        "schema": "test",
+        "name": "orders"
+      },
+      "columns": {
+        "1": {
+          "col_num": 1,
+          "name": "id",
+          "type": {
+            "type_name": {
+              "oid": 23,
+              "schema": "pg_catalog",
+              "name": "int4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "numeric_precision": 32
+          }
+        },
+        "2": {
+          "col_num": 2,
+          "name": "user_id",
+          "type": {
+            "type_name": {
+              "oid": 23,
+              "schema": "pg_catalog",
+              "name": "int4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "numeric_precision": 32
+          }
+        },
+        "3": {
+          "col_num": 3,
+          "name": "product_id",
+          "type": {
+            "type_name": {
+              "oid": 23,
+              "schema": "pg_catalog",
+              "name": "int4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "numeric_precision": 32
+          }
+        },
+        "4": {
+          "col_num": 4,
+          "name": "quantity",
+          "type": {
+            "type_name": {
+              "oid": 23,
+              "schema": "pg_catalog",
+              "name": "int4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "numeric_precision": 32
+          }
+        },
+        "5": {
+          "col_num": 5,
+          "name": "created_at",
+          "type": {
+            "type_name": {
+              "oid": 1114,
+              "schema": "pg_catalog",
+              "name": "timestamp"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "has_default": true,
+            "default": "now()"
+          }
+        }
+      },
+      "primary_key": {
+        "name": {
+          "oid": 17411,
+          "schema": "test",
+          "name": "orders_pkey"
+        },
+        "type": "PK",
+        "index": {
+          "name": {
+            "oid": 17410,
+            "schema": "test",
+            "name": "orders_pkey"
+          },
+          "columns": [
+            1
+          ],
+          "definition": "CREATE UNIQUE INDEX orders_pkey ON test.orders USING btree (id)",
+          "is_unique": true,
+          "is_primary": true
+        },
+        "definition": "PRIMARY KEY (id)",
+        "columns": [
+          1
+        ]
+      },
+      "foreign_keys": {
+        "17414": {
+          "reference_columns": [
+            1
+          ],
+          "reference": 17378
+        },
+        "17419": {
+          "reference_columns": [
+            1
+          ],
+          "reference": 17398
+        }
+      },
+      "constraints": [
+        17411,
+        17413,
+        17414,
+        17419
+      ],
+      "indexes": [
+        17410,
+        17412,
+        17424
+      ]
+    },
+    "17425": {
+      "name": {
+        "oid": 17425,
+        "schema": "test",
+        "name": "employers"
+      },
+      "columns": {
+        "1": {
+          "col_num": 1,
+          "name": "id",
+          "type": {
+            "type_name": {
+              "oid": 23,
+              "schema": "pg_catalog",
+              "name": "int4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "numeric_precision": 32
+          }
+        },
+        "2": {
+          "col_num": 2,
+          "name": "first_name",
+          "type": {
+            "type_name": {
+              "oid": 1043,
+              "schema": "pg_catalog",
+              "name": "varchar"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "has_char_max_length": true,
+            "char_max_length": 50
+          }
+        },
+        "3": {
+          "col_num": 3,
+          "name": "last_name",
+          "type": {
+            "type_name": {
+              "oid": 1043,
+              "schema": "pg_catalog",
+              "name": "varchar"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "has_char_max_length": true,
+            "char_max_length": 50
+          }
+        },
+        "4": {
+          "col_num": 4,
+          "name": "salary",
+          "type": {
+            "type_name": {
+              "oid": 700,
+              "schema": "pg_catalog",
+              "name": "float4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "numeric_precision": 24
+          }
+        },
+        "5": {
+          "col_num": 5,
+          "name": "bonus_percent",
+          "type": {
+            "type_name": {
+              "oid": 700,
+              "schema": "pg_catalog",
+              "name": "float4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "numeric_precision": 24
+          }
+        },
+        "6": {
+          "col_num": 6,
+          "name": "total_salary",
+          "type": {
+            "type_name": {
+              "oid": 700,
+              "schema": "pg_catalog",
+              "name": "float4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "numeric_precision": 24,
+            "has_default": true,
+            "is_generated": true,
+            "default": "(salary + ((salary * bonus_percent) / (100)::double precision))"
+          }
+        }
+      },
+      "primary_key": {
+        "name": {
+          "oid": 17430,
+          "schema": "test",
+          "name": "employers_pkey"
+        },
+        "type": "PK",
+        "index": {
+          "name": {
+            "oid": 17429,
+            "schema": "test",
+            "name": "employers_pkey"
+          },
+          "columns": [
+            1
+          ],
+          "definition": "CREATE UNIQUE INDEX employers_pkey ON test.employers USING btree (id)",
+          "is_unique": true,
+          "is_primary": true
+        },
+        "definition": "PRIMARY KEY (id)",
+        "columns": [
+          1
+        ]
+      },
+      "referenced_by": [
+        17440
+      ],
+      "constraints": [
+        17430
+      ],
+      "indexes": [
+        17429
+      ]
+    },
+    "17431": {
+      "name": {
+        "oid": 17431,
+        "schema": "test",
+        "name": "departments"
+      },
+      "columns": {
+        "1": {
+          "col_num": 1,
+          "name": "id",
+          "type": {
+            "type_name": {
+              "oid": 23,
+              "schema": "pg_catalog",
+              "name": "int4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true,
+            "numeric_precision": 32
+          }
+        },
+        "2": {
+          "col_num": 2,
+          "name": "name",
+          "type": {
+            "type_name": {
+              "oid": 25,
+              "schema": "pg_catalog",
+              "name": "text"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "not_nullable": true
+          }
+        },
+        "3": {
+          "col_num": 3,
+          "name": "manager_id",
+          "type": {
+            "type_name": {
+              "oid": 23,
+              "schema": "pg_catalog",
+              "name": "int4"
+            },
+            "type": "Base"
+          },
+          "attributes": {
+            "numeric_precision": 32
+          }
+        }
+      },
+      "primary_key": {
+        "name": {
+          "oid": 17437,
+          "schema": "test",
+          "name": "departments_pkey"
+        },
+        "type": "PK",
+        "index": {
+          "name": {
+            "oid": 17436,
+            "schema": "test",
+            "name": "departments_pkey"
+          },
+          "columns": [
+            1
+          ],
+          "definition": "CREATE UNIQUE INDEX departments_pkey ON test.departments USING btree (id)",
+          "is_unique": true,
+          "is_primary": true
+        },
+        "definition": "PRIMARY KEY (id)",
+        "columns": [
+          1
+        ]
+      },
+      "foreign_keys": {
+        "17440": {
+          "reference_columns": [
+            1
+          ],
+          "reference": 17425
+        }
+      },
+      "constraints": [
+        17437,
+        17439,
+        17440
+      ],
+      "indexes": [
+        17436,
+        17438
+      ]
+    }
+  },
+  "constraints": {
+    "17365": {
+      "name": {
+        "oid": 17365,
+        "schema": "test",
+        "name": "circles_c_excl"
+      },
+      "type": "Exclusion",
+      "index": {
+        "name": {
+          "oid": 17364,
+          "schema": "test",
+          "name": "circles_c_excl"
+        },
+        "columns": [
+          1
+        ],
+        "definition": "CREATE INDEX circles_c_excl ON test.circles USING gist (c)"
+      },
+      "definition": "EXCLUDE USING gist (c WITH \u0026\u0026)",
+      "columns": [
+        1
+      ]
+    },
+    "17372": {
+      "name": {
+        "oid": 17372,
+        "schema": "test",
+        "name": "roles_pkey"
+      },
+      "type": "PK",
+      "index": {
+        "name": {
+          "oid": 17371,
+          "schema": "test",
+          "name": "roles_pkey"
+        },
+        "columns": [
+          1
+        ],
+        "definition": "CREATE UNIQUE INDEX roles_pkey ON test.roles USING btree (id)",
+        "is_unique": true,
+        "is_primary": true
+      },
+      "definition": "PRIMARY KEY (id)",
+      "columns": [
+        1
+      ]
+    },
+    "17374": {
+      "name": {
+        "oid": 17374,
+        "schema": "test",
+        "name": "roles_name_key"
+      },
+      "type": "Unique",
+      "index": {
+        "name": {
+          "oid": 17373,
+          "schema": "test",
+          "name": "roles_name_key"
+        },
+        "columns": [
+          2
+        ],
+        "definition": "CREATE UNIQUE INDEX roles_name_key ON test.roles USING btree (name)",
+        "is_unique": true
+      },
+      "definition": "UNIQUE (name)",
+      "columns": [
+        2
+      ]
+    },
+    "17376": {
+      "name": {
+        "oid": 17376,
+        "schema": "test",
+        "name": "roles_id_name_key"
+      },
+      "type": "Unique",
+      "index": {
+        "name": {
+          "oid": 17375,
+          "schema": "test",
+          "name": "roles_id_name_key"
+        },
+        "columns": [
+          1,
+          2
+        ],
+        "definition": "CREATE UNIQUE INDEX roles_id_name_key ON test.roles USING btree (id, name)",
+        "is_unique": true
+      },
+      "definition": "UNIQUE (id, name)",
+      "columns": [
+        2,
+        1
+      ]
+    },
+    "17384": {
+      "name": {
+        "oid": 17384,
+        "schema": "test",
+        "name": "users_age_check"
+      },
+      "type": "Check",
+      "definition": "CHECK ((age \u003e 0))",
+      "columns": [
+        4
+      ]
+    },
+    "17385": {
+      "name": {
+        "oid": 17385,
+        "schema": "test",
+        "name": "users_price_range_check"
+      },
+      "type": "Check",
+      "definition": "CHECK ((price_range \u003c\u003e '(,)'::int4range))",
+      "columns": [
+        11
+      ]
+    },
+    "17386": {
+      "name": {
+        "oid": 17386,
+        "schema": "test",
+        "name": "users_check"
+      },
+      "type": "Check",
+      "definition": "CHECK ((((age \u003e 18) AND (status = 'active'::test.status)) OR (status = 'inactive'::test.status)))",
+      "columns": [
+        4,
+        6
+      ]
+    },
+    "17390": {
+      "name": {
+        "oid": 17390,
+        "schema": "test",
+        "name": "users_pkey"
+      },
+      "type": "PK",
+      "index": {
+        "name": {
+          "oid": 17389,
+          "schema": "test",
+          "name": "users_pkey"
+        },
+        "columns": [
+          1
+        ],
+        "definition": "CREATE UNIQUE INDEX users_pkey ON test.users USING btree (id)",
+        "is_unique": true,
+        "is_primary": true
+      },
+      "definition": "PRIMARY KEY (id)",
+      "columns": [
+        1
+      ]
+    },
+    "17392": {
+      "name": {
+        "oid": 17392,
+        "schema": "test",
+        "name": "users_email_key"
+      },
+      "type": "Unique",
+      "index": {
+        "name": {
+          "oid": 17391,
+          "schema": "test",
+          "name": "users_email_key"
+        },
+        "columns": [
+          3
+        ],
+        "definition": "CREATE UNIQUE INDEX users_email_key ON test.users USING btree (email)",
+        "is_unique": true
+      },
+      "definition": "UNIQUE (email)",
+      "columns": [
+        3
+      ]
+    },
+    "17393": {
+      "name": {
+        "oid": 17393,
+        "schema": "test",
+        "name": "user_role_composite_fk"
+      },
+      "type": "FK",
+      "index": {
+        "name": {
+          "oid": 17375,
+          "schema": "test",
+          "name": "roles_id_name_key"
+        },
+        "columns": [
+          1,
+          2
+        ],
+        "definition": "CREATE UNIQUE INDEX roles_id_name_key ON test.roles USING btree (id, name)",
+        "is_unique": true
+      },
+      "definition": "FOREIGN KEY (role_id, role_name) REFERENCES test.roles(id, name)",
+      "columns": [
+        9,
+        10
+      ]
+    },
+    "17401": {
+      "name": {
+        "oid": 17401,
+        "schema": "test",
+        "name": "products_quantity_range_check"
+      },
+      "type": "Check",
+      "definition": "CHECK ((quantity_range \u003c\u003e '(,)'::int4range))",
+      "columns": [
+        7
+      ]
+    },
+    "17405": {
+      "name": {
+        "oid": 17405,
+        "schema": "test",
+        "name": "products_pkey"
+      },
+      "type": "PK",
+      "index": {
+        "name": {
+          "oid": 17404,
+          "schema": "test",
+          "name": "products_pkey"
+        },
+        "columns": [
+          1
+        ],
+        "definition": "CREATE UNIQUE INDEX products_pkey ON test.products USING btree (id)",
+        "is_unique": true,
+        "is_primary": true
+      },
+      "definition": "PRIMARY KEY (id)",
+      "columns": [
+        1
+      ]
+    },
+    "17411": {
+      "name": {
+        "oid": 17411,
+        "schema": "test",
+        "name": "orders_pkey"
+      },
+      "type": "PK",
+      "index": {
+        "name": {
+          "oid": 17410,
+          "schema": "test",
+          "name": "orders_pkey"
+        },
+        "columns": [
+          1
+        ],
+        "definition": "CREATE UNIQUE INDEX orders_pkey ON test.orders USING btree (id)",
+        "is_unique": true,
+        "is_primary": true
+      },
+      "definition": "PRIMARY KEY (id)",
+      "columns": [
+        1
+      ]
+    },
+    "17413": {
+      "name": {
+        "oid": 17413,
+        "schema": "test",
+        "name": "orders_user_product_unique"
+      },
+      "type": "Unique",
+      "index": {
+        "name": {
+          "oid": 17412,
+          "schema": "test",
+          "name": "orders_user_product_unique"
+        },
+        "columns": [
+          2,
+          3
+        ],
+        "definition": "CREATE UNIQUE INDEX orders_user_product_unique ON test.orders USING btree (user_id, product_id) NULLS NOT DISTINCT",
+        "is_unique": true,
+        "is_nulls_not_distinct": true
+      },
+      "definition": "UNIQUE NULLS NOT DISTINCT (user_id, product_id)",
+      "columns": [
+        2,
+        3
+      ]
+    },
+    "17414": {
+      "name": {
+        "oid": 17414,
+        "schema": "test",
+        "name": "orders_user_id_fkey"
+      },
+      "type": "FK",
+      "index": {
+        "name": {
+          "oid": 17389,
+          "schema": "test",
+          "name": "users_pkey"
+        },
+        "columns": [
+          1
+        ],
+        "definition": "CREATE UNIQUE INDEX users_pkey ON test.users USING btree (id)",
+        "is_unique": true,
+        "is_primary": true
+      },
+      "definition": "FOREIGN KEY (user_id) REFERENCES test.users(id)",
+      "columns": [
+        2
+      ]
+    },
+    "17419": {
+      "name": {
+        "oid": 17419,
+        "schema": "test",
+        "name": "orders_product_id_fkey"
+      },
+      "type": "FK",
+      "index": {
+        "name": {
+          "oid": 17404,
+          "schema": "test",
+          "name": "products_pkey"
+        },
+        "columns": [
+          1
+        ],
+        "definition": "CREATE UNIQUE INDEX products_pkey ON test.products USING btree (id)",
+        "is_unique": true,
+        "is_primary": true
+      },
+      "definition": "FOREIGN KEY (product_id) REFERENCES test.products(id) ON DELETE CASCADE",
+      "columns": [
+        3
+      ]
+    },
+    "17430": {
+      "name": {
+        "oid": 17430,
+        "schema": "test",
+        "name": "employers_pkey"
+      },
+      "type": "PK",
+      "index": {
+        "name": {
+          "oid": 17429,
+          "schema": "test",
+          "name": "employers_pkey"
+        },
+        "columns": [
+          1
+        ],
+        "definition": "CREATE UNIQUE INDEX employers_pkey ON test.employers USING btree (id)",
+        "is_unique": true,
+        "is_primary": true
+      },
+      "definition": "PRIMARY KEY (id)",
+      "columns": [
+        1
+      ]
+    },
+    "17437": {
+      "name": {
+        "oid": 17437,
+        "schema": "test",
+        "name": "departments_pkey"
+      },
+      "type": "PK",
+      "index": {
+        "name": {
+          "oid": 17436,
+          "schema": "test",
+          "name": "departments_pkey"
+        },
+        "columns": [
+          1
+        ],
+        "definition": "CREATE UNIQUE INDEX departments_pkey ON test.departments USING btree (id)",
+        "is_unique": true,
+        "is_primary": true
+      },
+      "definition": "PRIMARY KEY (id)",
+      "columns": [
+        1
+      ]
+    },
+    "17439": {
+      "name": {
+        "oid": 17439,
+        "schema": "test",
+        "name": "departments_manager_id_key"
+      },
+      "type": "Unique",
+      "index": {
+        "name": {
+          "oid": 17438,
+          "schema": "test",
+          "name": "departments_manager_id_key"
+        },
+        "columns": [
+          3
+        ],
+        "definition": "CREATE UNIQUE INDEX departments_manager_id_key ON test.departments USING btree (manager_id)",
+        "is_unique": true
+      },
+      "definition": "UNIQUE (manager_id)",
+      "columns": [
+        3
+      ]
+    },
+    "17440": {
+      "name": {
+        "oid": 17440,
+        "schema": "test",
+        "name": "departments_manager_id_fkey"
+      },
+      "type": "FK",
+      "index": {
+        "name": {
+          "oid": 17429,
+          "schema": "test",
+          "name": "employers_pkey"
+        },
+        "columns": [
+          1
+        ],
+        "definition": "CREATE UNIQUE INDEX employers_pkey ON test.employers USING btree (id)",
+        "is_unique": true,
+        "is_primary": true
+      },
+      "definition": "FOREIGN KEY (manager_id) REFERENCES test.employers(id)",
+      "columns": [
+        3
+      ]
+    }
+  },
+  "indexes": {
+    "17364": {
+      "name": {
+        "oid": 17364,
+        "schema": "test",
+        "name": "circles_c_excl"
+      },
+      "columns": [
+        1
+      ],
+      "definition": "CREATE INDEX circles_c_excl ON test.circles USING gist (c)"
+    },
+    "17371": {
+      "name": {
+        "oid": 17371,
+        "schema": "test",
+        "name": "roles_pkey"
+      },
+      "columns": [
+        1
+      ],
+      "definition": "CREATE UNIQUE INDEX roles_pkey ON test.roles USING btree (id)",
+      "is_unique": true,
+      "is_primary": true
+    },
+    "17373": {
+      "name": {
+        "oid": 17373,
+        "schema": "test",
+        "name": "roles_name_key"
+      },
+      "columns": [
+        2
+      ],
+      "definition": "CREATE UNIQUE INDEX roles_name_key ON test.roles USING btree (name)",
+      "is_unique": true
+    },
+    "17375": {
+      "name": {
+        "oid": 17375,
+        "schema": "test",
+        "name": "roles_id_name_key"
+      },
+      "columns": [
+        1,
+        2
+      ],
+      "definition": "CREATE UNIQUE INDEX roles_id_name_key ON test.roles USING btree (id, name)",
+      "is_unique": true
+    },
+    "17389": {
+      "name": {
+        "oid": 17389,
+        "schema": "test",
+        "name": "users_pkey"
+      },
+      "columns": [
+        1
+      ],
+      "definition": "CREATE UNIQUE INDEX users_pkey ON test.users USING btree (id)",
+      "is_unique": true,
+      "is_primary": true
+    },
+    "17391": {
+      "name": {
+        "oid": 17391,
+        "schema": "test",
+        "name": "users_email_key"
+      },
+      "columns": [
+        3
+      ],
+      "definition": "CREATE UNIQUE INDEX users_email_key ON test.users USING btree (email)",
+      "is_unique": true
+    },
+    "17404": {
+      "name": {
+        "oid": 17404,
+        "schema": "test",
+        "name": "products_pkey"
+      },
+      "columns": [
+        1
+      ],
+      "definition": "CREATE UNIQUE INDEX products_pkey ON test.products USING btree (id)",
+      "is_unique": true,
+      "is_primary": true
+    },
+    "17410": {
+      "name": {
+        "oid": 17410,
+        "schema": "test",
+        "name": "orders_pkey"
+      },
+      "columns": [
+        1
+      ],
+      "definition": "CREATE UNIQUE INDEX orders_pkey ON test.orders USING btree (id)",
+      "is_unique": true,
+      "is_primary": true
+    },
+    "17412": {
+      "name": {
+        "oid": 17412,
+        "schema": "test",
+        "name": "orders_user_product_unique"
+      },
+      "columns": [
+        2,
+        3
+      ],
+      "definition": "CREATE UNIQUE INDEX orders_user_product_unique ON test.orders USING btree (user_id, product_id) NULLS NOT DISTINCT",
+      "is_unique": true,
+      "is_nulls_not_distinct": true
+    },
+    "17424": {
+      "name": {
+        "oid": 17424,
+        "schema": "test",
+        "name": "test_orders_user_id_idx"
+      },
+      "columns": [
+        2
+      ],
+      "definition": "CREATE INDEX test_orders_user_id_idx ON test.orders USING btree (user_id)"
+    },
+    "17429": {
+      "name": {
+        "oid": 17429,
+        "schema": "test",
+        "name": "employers_pkey"
+      },
+      "columns": [
+        1
+      ],
+      "definition": "CREATE UNIQUE INDEX employers_pkey ON test.employers USING btree (id)",
+      "is_unique": true,
+      "is_primary": true
+    },
+    "17436": {
+      "name": {
+        "oid": 17436,
+        "schema": "test",
+        "name": "departments_pkey"
+      },
+      "columns": [
+        1
+      ],
+      "definition": "CREATE UNIQUE INDEX departments_pkey ON test.departments USING btree (id)",
+      "is_unique": true,
+      "is_primary": true
+    },
+    "17438": {
+      "name": {
+        "oid": 17438,
+        "schema": "test",
+        "name": "departments_manager_id_key"
+      },
+      "columns": [
+        3
+      ],
+      "definition": "CREATE UNIQUE INDEX departments_manager_id_key ON test.departments USING btree (manager_id)",
+      "is_unique": true
+    }
+  }
+}

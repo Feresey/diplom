@@ -11,6 +11,7 @@ require (
 	github.com/magefile/mage v1.14.0
 	github.com/stretchr/testify v1.8.1
 	github.com/urfave/cli/v2 v2.25.3
+	github.com/yuin/gopher-lua v1.1.0
 	go.uber.org/zap v1.24.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -36,5 +37,6 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.9.0 // indirect
+	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 	golang.org/x/text v0.9.0 // indirect
 )

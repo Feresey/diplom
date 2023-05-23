@@ -37,7 +37,7 @@ func (id *IntDomain) Reset() {
 	id.value = 0
 }
 
-func (id *IntDomain) ResetWith(top int) {
+func (id *IntDomain) Init(top int) {
 	id.Reset()
 	id.top = top
 }
@@ -72,7 +72,7 @@ func (fd *FloatDomain) Reset() {
 	fd.value = 0
 }
 
-func (fd *FloatDomain) ResetWith(step, top float64) {
+func (fd *FloatDomain) Init(step, top float64) {
 	fd.Reset()
 	fd.step = step
 	fd.top = top
@@ -103,7 +103,7 @@ func (td *TimeDomain) Next() bool {
 func (td *TimeDomain) Value() string { return td.value.Format(time.RFC3339) }
 func (td *TimeDomain) Reset()        { td.index = -1 }
 
-func (td *TimeDomain) ResetWith(now time.Time, top int) {
+func (td *TimeDomain) Init(now time.Time, top int) {
 	td.Reset()
 	td.top = top
 	td.value = now
