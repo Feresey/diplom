@@ -45,22 +45,10 @@ func NewParser(
 	log *zap.Logger,
 ) *Parser {
 	return &Parser{
-		log:  log.Named("parser"),
-		conn: conn,
-		q:    query.Queries{},
-		schema: parseSchema{
-			typesByOID: make(map[int]schema.DBType),
-			types:      make(map[int]query.Type),
-
-			enumList: nil,
-			enums:    make(map[int]query.Enum),
-
-			tables: make(map[int]parseTable),
-
-			constraints:      make(map[int]query.Constraint),
-			constraintsByOID: make(map[int]schema.Constraint),
-			indexes:          make(map[int]query.Index),
-		},
+		log:    log.Named("parser"),
+		conn:   conn,
+		q:      query.Queries{},
+		schema: newParseSchema(),
 	}
 }
 

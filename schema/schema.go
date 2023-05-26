@@ -5,26 +5,25 @@ import lua "github.com/yuin/gopher-lua"
 // Identifier описывает имя элемента.
 type Identifier struct {
 	// Row identifier
-	OID int `json:"oid,omitempty"`
+	OID int `json:"oid"`
 	// Schema name
-	Schema string `json:"schema,omitempty"`
+	Schema string `json:"schema"`
 	// Имя элемента
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 }
 
 func (i Identifier) String() string { return i.Schema + "." + i.Name }
 
 // Schema отражает схему, расположенную в базе данных.
 type Schema struct {
-	Types  map[string]DBType   `json:"types,omitempty"`
-	Enums  map[string]EnumType `json:"enums,omitempty"`
-	Tables map[string]Table    `json:"tables,omitempty"`
+	Types  map[string]*DBType `json:"types"`
+	Tables map[string]Table   `json:"tables"`
 }
 
 // Table описывает таблицу базы данных.
 type Table struct {
 	// имя таблицы
-	Name Identifier `json:"name,omitempty"`
+	Name Identifier `json:"name"`
 	// мапа колонок, где ключ - имя колонки
 	Columns map[string]Column `json:"columns,omitempty"`
 
@@ -33,10 +32,10 @@ type Table struct {
 	// Внешние ключи таблицы
 	ForeignKeys map[string]ForeignKey `json:"foreign_keys,omitempty"`
 	// Таблицы, которые ссылаются на эту таблицу
-	ReferencedBy map[string]Constraint `json:"referenced_by,omitempty"`
+	ReferencedBy map[string]*Constraint `json:"referenced_by,omitempty"`
 
 	// Список всех CONSTRAINT-ов текущей таблицы
-	Constraints map[string]Constraint `json:"constraints,omitempty"`
+	Constraints map[string]*Constraint `json:"constraints,omitempty"`
 	// Список всех INDEX-ов текущей таблицы
 	Indexes map[string]Index `json:"indexes,omitempty"`
 }
@@ -49,11 +48,11 @@ func (t Table) GetOID() int    { return t.Name.OID }
 type ForeignKey struct {
 	// CONSTRAINT в текущей таблице
 	// Constraint.Type == FK
-	Constraint Constraint `json:"constraint"`
+	Constraint *Constraint `json:"constraint"`
 	// Таблица, на которую ссылаются
 	ReferenceTable string `json:"reference"`
 	// Список колонок во внешней таблице, на которые ссылается FOREIGN KEY
-	ReferenceColumns []string `json:"reference_columns,omitempty"`
+	ReferenceColumns []string `json:"reference_columns"`
 }
 
 func (fk ForeignKey) String() string { return fk.Constraint.String() }
@@ -61,13 +60,13 @@ func (fk ForeignKey) String() string { return fk.Constraint.String() }
 // Column описывает колонку таблицы.
 type Column struct {
 	// Порядковый номер колонки
-	ColNum int `json:"col_num,omitempty"`
+	ColNum int `json:"col_num"`
 	// Имя колонки
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 	// Тип колонки
-	Type DBType `json:"type,omitempty"`
+	Type *DBType `json:"type"`
 	// Аттрибуты колонки
-	Attributes ColumnAttributes `json:"attributes,omitempty"`
+	Attributes ColumnAttributes `json:"attributes"`
 }
 
 func (c *Column) String() string { return c.Name }
@@ -87,44 +86,20 @@ const (
 	DataTypePseudo              // Домен. Основан на любом другом типе и включает в себя ограничения для него
 )
 
-type DBType interface {
-	GetOID() int
-	TypType() DataType
-	String() string
-	ToLua(l *lua.LState) *lua.LTable
+type DBType struct {
+	TypeName         Identifier        `json:"type_name"`
+	Type             DataType          `json:"typtype"`
+	ElemType         *DBType           `json:"elem_type,omitempty"`
+	EnumValues       []string          `json:"enum_values,omitempty"`
+	DomainAttributes *DomainAttributes `json:"domain_attributes,omitempty"`
 }
 
-type BaseType struct {
-	TypeName Identifier `json:"type_name"`
-	Type     DataType   `json:"typtype"`
+func (t *DBType) String() string    { return t.TypeName.String() }
+func (t *DBType) GetOID() int       { return t.TypeName.OID }
+func (t *DBType) TypType() DataType { return t.Type }
+func (t *DBType) ToLua(*lua.LState) *lua.LTable {
+	return nil
 }
-
-func (t *BaseType) String() string                { return t.TypeName.String() }
-func (t *BaseType) GetOID() int                   { return t.TypeName.OID }
-func (t *BaseType) TypType() DataType             { return t.Type }
-func (t *BaseType) ToLua(*lua.LState) *lua.LTable { return nil }
-
-type ElemType struct {
-	BaseType `json:",omitempty"`
-	ElemType DBType `json:"elem_type"`
-}
-
-func (d *ElemType) ToLua(*lua.LState) *lua.LTable { return nil }
-
-type EnumType struct {
-	BaseType `json:",omitempty"`
-	Values   []string `json:"values"`
-}
-
-func (d *EnumType) ToLua(*lua.LState) *lua.LTable { return nil }
-
-type DomainType struct {
-	BaseType   `json:",omitempty"`
-	ElemType   DBType           `json:"elem_type"`
-	Attributes DomainAttributes `json:"attributes"`
-}
-
-func (d *DomainType) ToLua(*lua.LState) *lua.LTable { return nil }
 
 type DomainAttributes struct {
 	// Допустимы ли NULL значения колонки
@@ -173,7 +148,7 @@ type Constraint struct {
 	Index *Index `json:"index,omitempty"`
 
 	// Результат функции pg_getconstraintdef. Я не уверен что это вообще нужно, но пусть будет.
-	Definition string `json:"definition,omitempty"`
+	Definition string `json:"definition"`
 
 	// Колонки, на которые действует ограничение
 	// Колонки всегда принадлежат той же таблице, которой принадлежит ограничение
@@ -191,7 +166,7 @@ type Index struct {
 	// Колонки, которые затрагивает индекс
 	Columns []string `json:"columns"`
 	// Определение индекса
-	Definition string `json:"definition,omitempty"`
+	Definition string `json:"definition"`
 
 	IsUnique  bool `json:"is_unique,omitempty"`
 	IsPrimary bool `json:"is_primary,omitempty"`

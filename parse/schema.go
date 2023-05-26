@@ -32,7 +32,7 @@ var pgTypType = map[string]schema.DataType{
 }
 
 type parseSchema struct {
-	typesByOID map[int]schema.DBType
+	typesByOID map[int]*schema.DBType
 	types      map[int]query.Type
 
 	enumList []int
@@ -41,8 +41,24 @@ type parseSchema struct {
 	tables map[int]parseTable
 
 	constraints      map[int]query.Constraint
-	constraintsByOID map[int]schema.Constraint
+	constraintsByOID map[int]*schema.Constraint
 	indexes          map[int]query.Index
+}
+
+func newParseSchema() parseSchema {
+	return parseSchema{
+		typesByOID: make(map[int]*schema.DBType),
+		types:      make(map[int]query.Type),
+
+		enumList: nil,
+		enums:    make(map[int]query.Enum),
+
+		tables: make(map[int]parseTable),
+
+		constraints:      make(map[int]query.Constraint),
+		constraintsByOID: make(map[int]*schema.Constraint),
+		indexes:          make(map[int]query.Index),
+	}
 }
 
 type parseTable struct {
@@ -52,8 +68,7 @@ type parseTable struct {
 
 func (ps *parseSchema) convertToSchema() (*schema.Schema, error) {
 	s := &schema.Schema{
-		Types:  make(map[string]schema.DBType),
-		Enums:  make(map[string]schema.EnumType),
+		Types:  make(map[string]*schema.DBType),
 		Tables: make(map[string]schema.Table),
 	}
 
@@ -103,10 +118,6 @@ func (ps *parseSchema) convertTypes(s *schema.Schema) error {
 
 	for _, typ := range ps.typesByOID {
 		s.Types[typ.String()] = typ
-		if typ.TypType() == schema.DataTypeEnum {
-			// panic?
-			s.Enums[typ.String()] = *typ.(*schema.EnumType)
-		}
 	}
 	return nil
 }
@@ -124,7 +135,7 @@ func getTypeError(oid int) error {
 	return typeNotFoundError{OID: oid}
 }
 
-func (ps *parseSchema) fillType(dbtype *query.Type) (schema.DBType, error) {
+func (ps *parseSchema) fillType(dbtype *query.Type) (*schema.DBType, error) {
 	typType, ok := pgTypType[dbtype.TypeType]
 	if !ok {
 		return nil, xerrors.Errorf("typtype value is undefined: %q", dbtype.TypeType)
@@ -133,14 +144,11 @@ func (ps *parseSchema) fillType(dbtype *query.Type) (schema.DBType, error) {
 		typType = schema.DataTypeArray
 	}
 
-	baseType := schema.BaseType{
-		TypeName: schema.Identifier{
-			OID:    dbtype.TypeOID,
-			Schema: dbtype.TypeSchema,
-			Name:   dbtype.TypeName,
-		},
-		Type: typType,
-	}
+	var (
+		elemType         *schema.DBType
+		enumValues       []string
+		domainAttributes *schema.DomainAttributes
+	)
 
 	switch typType {
 	default:
@@ -152,28 +160,19 @@ func (ps *parseSchema) fillType(dbtype *query.Type) (schema.DBType, error) {
 		if !ok {
 			return nil, xerrors.Errorf("get array elem type: %w", getTypeError(oid))
 		}
-		return &schema.ElemType{
-			BaseType: baseType,
-			ElemType: elem,
-		}, nil
+		elemType = elem
 	case schema.DataTypeEnum:
-		values, ok := ps.enums[baseType.GetOID()]
+		enum, ok := ps.enums[dbtype.TypeOID]
 		if !ok {
-			return nil, xerrors.Errorf("values for enum %q not found", baseType.String())
+			return nil, xerrors.Errorf("values for enum %s.%s not found", dbtype.TypeSchema, dbtype.TypeName)
 		}
-		return &schema.EnumType{
-			BaseType: baseType,
-			Values:   values.Values,
-		}, nil
+		enumValues = enum.Values
 	case schema.DataTypeRange:
 		elem, ok := ps.typesByOID[int(dbtype.RangeElementTypeOID.Int32)]
 		if !ok {
 			return nil, xerrors.Errorf("get range elem type: %w", getTypeError(int(dbtype.RangeElementTypeOID.Int32)))
 		}
-		return &schema.ElemType{
-			BaseType: baseType,
-			ElemType: elem,
-		}, nil
+		elemType = elem
 	case schema.DataTypeMultiRange:
 	// TODO add multirange type
 	case schema.DataTypeComposite:
@@ -183,21 +182,30 @@ func (ps *parseSchema) fillType(dbtype *query.Type) (schema.DBType, error) {
 		if !ok {
 			return nil, xerrors.Errorf("get domain elem type: %w", getTypeError(int(dbtype.DomainTypeOID.Int32)))
 		}
-		return &schema.DomainType{
-			Attributes: schema.DomainAttributes{
-				NotNullable:      !dbtype.DomainIsNotNullable,
-				HasCharMaxLength: dbtype.DomainCharacterMaxSize.Valid,
-				CharMaxLength:    int(dbtype.DomainCharacterMaxSize.Int32),
-				ArrayDims:        dbtype.DomainArrayDims,
-				IsNumeric:        dbtype.DomainIsNumeric,
-				NumericPrecision: int(dbtype.DomainNumericPrecision.Int32),
-				NumericScale:     int(dbtype.DomainNumericScale.Int32),
-			},
-			ElemType: elem,
-		}, nil
+		elemType = elem
+		domainAttributes = &schema.DomainAttributes{
+			NotNullable:      !dbtype.DomainIsNotNullable,
+			HasCharMaxLength: dbtype.DomainCharacterMaxSize.Valid,
+			CharMaxLength:    int(dbtype.DomainCharacterMaxSize.Int32),
+			ArrayDims:        dbtype.DomainArrayDims,
+			IsNumeric:        dbtype.DomainIsNumeric,
+			NumericPrecision: int(dbtype.DomainNumericPrecision.Int32),
+			NumericScale:     int(dbtype.DomainNumericScale.Int32),
+		}
 	case schema.DataTypePseudo:
 	}
-	return &baseType, nil
+
+	return &schema.DBType{
+		TypeName: schema.Identifier{
+			OID:    dbtype.TypeOID,
+			Schema: dbtype.TypeSchema,
+			Name:   dbtype.TypeName,
+		},
+		Type:             typType,
+		ElemType:         elemType,
+		DomainAttributes: domainAttributes,
+		EnumValues:       enumValues,
+	}, nil
 }
 
 func (ps *parseSchema) convertTables(s *schema.Schema) error {
@@ -211,8 +219,8 @@ func (ps *parseSchema) convertTables(s *schema.Schema) error {
 			Columns:      make(map[string]schema.Column),
 			PrimaryKey:   nil,
 			ForeignKeys:  make(map[string]schema.ForeignKey),
-			ReferencedBy: make(map[string]schema.Constraint),
-			Constraints:  make(map[string]schema.Constraint),
+			ReferencedBy: make(map[string]*schema.Constraint),
+			Constraints:  make(map[string]*schema.Constraint),
 			Indexes:      make(map[string]schema.Index),
 		}
 
@@ -280,7 +288,7 @@ func (ps *parseSchema) convertConstraints(s *schema.Schema) error {
 				table, dbconstraint.ConstraintName, err)
 		}
 
-		c := schema.Constraint{
+		c := &schema.Constraint{
 			OID:        dbconstraint.ConstraintOID,
 			Name:       dbconstraint.ConstraintName,
 			Type:       typ,
@@ -295,7 +303,7 @@ func (ps *parseSchema) convertConstraints(s *schema.Schema) error {
 		switch c.Type {
 		case schema.ConstraintTypePK:
 			// PRIMARY KEY либо один либо нет его
-			table.PrimaryKey = &c
+			table.PrimaryKey = c
 		case schema.ConstraintTypeFK:
 			dbreftable, reftable, err := ps.getTable(s, dbconstraint.TableOID)
 			if err != nil {
@@ -307,7 +315,7 @@ func (ps *parseSchema) convertConstraints(s *schema.Schema) error {
 				return xerrors.Errorf("check ref table %q columns for fk constraint %q of table %q: %w",
 					reftable, dbconstraint.ConstraintName, table, err)
 			}
-			table.ForeignKeys[reftable.String()] = schema.ForeignKey{
+			table.ForeignKeys[c.Name] = schema.ForeignKey{
 				Constraint:       c,
 				ReferenceTable:   reftable.String(),
 				ReferenceColumns: refcols,
@@ -351,7 +359,6 @@ func (ps *parseSchema) convertIndexes(s *schema.Schema) error {
 			}
 
 			c.Index = &index
-			table.Constraints[c.String()] = c
 		}
 	}
 	return nil

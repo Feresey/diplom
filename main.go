@@ -75,8 +75,10 @@ func main() {
 		},
 		EnableBashCompletion: true,
 	}
-	err := app.Run(os.Args)
-	println(err)
+	if err := app.Run(os.Args); err != nil {
+		println(err.Error())
+		os.Exit(2)
+	}
 }
 
 type BaseCommand struct {

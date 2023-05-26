@@ -8,7 +8,6 @@ import (
 
 	"github.com/Feresey/mtest/schema"
 	mapset "github.com/deckarep/golang-set/v2"
-	"go.uber.org/zap"
 )
 
 const pgCatalogPrefix = "pg_catalog."
@@ -181,7 +180,7 @@ func (g *Generator) transformChecks(
 	return res
 }
 
-func (g *Generator) getTypeChecks(check *ColumnChecks, typ schema.DBType) {
+func (g *Generator) getTypeChecks(check *ColumnChecks, typ *schema.DBType) {
 	switch typ.TypType() {
 	case schema.DataTypeBase:
 		g.baseTypesChecks(check, strings.TrimPrefix(typ.String(), pgCatalogPrefix))
@@ -190,16 +189,12 @@ func (g *Generator) getTypeChecks(check *ColumnChecks, typ schema.DBType) {
 		// [None], [None, None], [[None]], [], [[1],[2]], [[1],[None]], [[None], [None]]
 		// dims := col.Attributes.ArrayDims
 	case schema.DataTypeEnum:
-		enum, ok := typ.(*schema.EnumType)
-		if !ok {
-			g.log.Error("schema.DBType.TypType() is Enum, but real type is not enum", zap.Stringer("type", typ))
-			return
-		}
 		check.AddValuesProcess(func(s string) string {
-			return fmt.Sprintf("'%s'::%s", s, enum.String())
-		}, enum.Values...)
+			return fmt.Sprintf("'%s'::%s", s, typ.String())
+		}, typ.EnumValues...)
 	case schema.DataTypeDomain:
-		g.getTypeChecks(check, typ.(*schema.DomainType).ElemType)
+		// TODO domain attributes checks
+		g.getTypeChecks(check, typ.ElemType)
 	case schema.DataTypeComposite,
 		schema.DataTypeRange,
 		schema.DataTypeMultiRange,

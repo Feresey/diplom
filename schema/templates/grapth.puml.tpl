@@ -6,7 +6,7 @@ class {{$table.Name}} {
   {{- /* with pk */}}
   {{- with .PrimaryKey}}
   {{- range .Columns}}
-  * {{.Name}}: {{template "smalltype" .}}
+  * {{.}}: {{template "smalltype" (index $table.Columns .)}}
   {{- else}}
   <PK COLUMN NOT FOUND>
   {{- end}}
@@ -16,14 +16,14 @@ class {{$table.Name}} {
 
   {{- /* range fk */}}
   {{- range $fk := $table.ForeignKeys}}
-    {{- range $fk.Foreign.Columns}}
-  * {{.Name}}: {{template "smalltype" .}} REFERENCES {{$fk.Reference.Name}}({{$fk.ReferenceColumns | columnNames}})
+    {{- range $fk.Constraint.Columns}}
+  * {{.}}: {{template "smalltype" (index $table.Columns .)}} REFERENCES {{$fk.ReferenceTable}}({{join "," $fk.ReferenceColumns}})
     {{- end}}
   {{- /* range fk */}}
   {{- end}}
   {{- /* range columns */}}
   {{- range .Columns}}
-    {{- if or (isPK $table .) (isFK $table .)}}
+    {{- if or (isPK $table .Name) (isFK $table .Name)}}
     {{- else}}
   {{.Name}}: {{template "smalltype" .}}
     {{- end}}

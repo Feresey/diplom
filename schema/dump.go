@@ -3,7 +3,6 @@ package schema
 import (
 	"embed"
 	"io"
-	"sort"
 	"strings"
 	"text/template"
 
@@ -45,32 +44,24 @@ func dump(w io.Writer, tplName TemplateName, data any) error {
 	t := template.New("").
 		Funcs(sprig.TxtFuncMap()).
 		Funcs(template.FuncMap{
-			"columnNames": func(cols map[int]*Column) string {
-				names := make([]string, 0, len(cols))
-				for _, col := range cols {
-					names = append(names, col.Name)
-				}
-				sort.Strings(names)
-				return strings.Join(names, ", ")
-			},
 			"space": func(namelen int, maxlen int) string {
 				return strings.Repeat(" ", maxlen-namelen)
 			},
-			"isPK": func(t *Table, col *Column) bool {
+			"isPK": func(t Table, col string) bool {
 				if t.PrimaryKey == nil {
 					return false
 				}
-				for colnum := range t.PrimaryKey.Columns {
-					if colnum == col.ColNum {
+				for _, colname := range t.PrimaryKey.Columns {
+					if colname == col {
 						return true
 					}
 				}
 				return false
 			},
-			"isFK": func(t *Table, col *Column) bool {
+			"isFK": func(t Table, col string) bool {
 				for _, fk := range t.ForeignKeys {
-					for colnum := range fk.Constraint.Columns {
-						if colnum == col.ColNum {
+					for _, colname := range fk.Constraint.Columns {
+						if colname == col {
 							return true
 						}
 					}
