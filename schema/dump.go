@@ -2,13 +2,13 @@ package schema
 
 import (
 	"embed"
-	"fmt"
 	"io"
 	"sort"
 	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
+	"golang.org/x/xerrors"
 )
 
 //go:embed templates/*.tpl
@@ -35,7 +35,7 @@ func (s *Schema) Dump(w io.Writer, tplName TemplateName) error {
 			Graph:  s.NewGraph(),
 		}
 	default:
-		return fmt.Errorf("undefined template name: %s", tplName)
+		return xerrors.Errorf("undefined template name: %s", tplName)
 	}
 
 	return dump(w, tplName, data)

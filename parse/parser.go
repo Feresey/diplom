@@ -2,13 +2,15 @@ package parse
 
 import (
 	"context"
-	"fmt"
 
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
+	"golang.org/x/xerrors"
 
 	"github.com/Feresey/mtest/parse/query"
 	"github.com/Feresey/mtest/schema"
+	mapset "github.com/deckarep/golang-set/v2"
 )
 
 type Config struct {
@@ -47,9 +49,8 @@ func NewParser(
 		conn: conn,
 		q:    query.Queries{},
 		schema: parseSchema{
-			typesLoadOrder: nil,
-			typesByOID:     make(map[int]schema.DBType),
-			types:          make(map[int]query.Type),
+			typesByOID: make(map[int]schema.DBType),
+			types:      make(map[int]query.Type),
 
 			enumList: nil,
 			enums:    make(map[int]query.Enum),
@@ -71,23 +72,25 @@ func (p *Parser) LoadSchema(ctx context.Context, conf Config) (*schema.Schema, e
 	}
 
 	if err := p.loadTables(ctx, patterns); err != nil {
-		return nil, fmt.Errorf("load tables: %w", err)
+		return nil, xerrors.Errorf("load tables: %w", err)
 	}
 	tableOIDs := maps.Keys(p.schema.tables)
+	slices.Sort(tableOIDs)
+
 	if err := p.loadTablesColumns(ctx, tableOIDs); err != nil {
-		return nil, fmt.Errorf("load tables columns: %w", err)
+		return nil, xerrors.Errorf("load tables columns: %w", err)
 	}
 	if err := p.loadConstraints(ctx, tableOIDs); err != nil {
-		return nil, fmt.Errorf("load constraints: %w", err)
+		return nil, xerrors.Errorf("load constraints: %w", err)
 	}
 	if err := p.loadIndexes(ctx, tableOIDs); err != nil {
-		return nil, fmt.Errorf("load indexes: %w", err)
+		return nil, xerrors.Errorf("load indexes: %w", err)
 	}
 	if err := p.loadTypes(ctx); err != nil {
-		return nil, fmt.Errorf("load types: %w", err)
+		return nil, xerrors.Errorf("load types: %w", err)
 	}
 	if err := p.loadEnums(ctx); err != nil {
-		return nil, fmt.Errorf("load enums: %w", err)
+		return nil, xerrors.Errorf("load enums: %w", err)
 	}
 	return p.schema.convertToSchema()
 }
@@ -104,8 +107,6 @@ func (p *Parser) loadTables(
 	}
 	p.log.Debug("loaded tables", zap.Reflect("tables", tables))
 
-	// realloc
-	p.schema.tables = make(map[int]parseTable, len(tables))
 	for _, dbtable := range tables {
 		table := parseTable{
 			table:   dbtable,
@@ -128,14 +129,12 @@ func (p *Parser) loadTablesColumns(
 		p.log.Error("failed to query tables columns", zap.Error(err))
 		return err
 	}
-	p.log.Debug("columns loaded", zap.Int("n", len(columns)))
+	p.log.Debug("loaded columns", zap.Int("n", len(columns)))
 
 	for _, col := range columns {
 		table, ok := p.schema.tables[col.TableOID]
 		if !ok {
-			err := fmt.Errorf("table with oid %d not found", col.TableOID)
-			p.log.Error("failed to get table for column", zap.Error(err))
-			return err
+			return xerrors.Errorf("table with oid %d not found", col.TableOID)
 		}
 		table.columns[col.ColumnNum] = col
 	}
@@ -152,14 +151,14 @@ func (p *Parser) loadConstraints(
 		p.log.Error("failed to query tables constraints", zap.Error(err))
 		return err
 	}
-	p.log.Debug("loaded constraints", zap.Int("n", len(cons)))
 
-	// realloc
-	p.schema.constraints = make(map[int]query.Constraint, len(cons))
 	for _, c := range cons {
 		p.schema.constraints[c.ConstraintOID] = c
 	}
 
+	conids := maps.Keys(p.schema.constraints)
+	slices.Sort(conids)
+	p.log.Debug("loaded constraints", zap.Int("n", len(cons)), zap.Ints("oids", conids))
 	return nil
 }
 
@@ -167,57 +166,53 @@ func (p *Parser) loadIndexes(
 	ctx context.Context,
 	tableOIDs []int,
 ) error {
-	indexes, err := p.q.Indexes(ctx, p.conn, tableOIDs, maps.Keys(p.schema.constraints))
+	cons := maps.Keys(p.schema.constraints)
+	slices.Sort(cons)
+	indexes, err := p.q.Indexes(ctx, p.conn, tableOIDs, cons)
 	if err != nil {
 		p.log.Error("failed to query tables indexes", zap.Error(err))
 		return err
 	}
-	p.log.Debug("loaded indexes", zap.Int("n", len(indexes)))
 
 	for _, idx := range indexes {
 		p.schema.indexes[idx.IndexOID] = idx
 	}
+
+	inds := maps.Keys(p.schema.indexes)
+	slices.Sort(inds)
+	p.log.Debug("loaded indexes", zap.Int("n", len(inds)), zap.Ints("oids", inds))
 	return nil
 }
 
 func (p *Parser) loadTypes(ctx context.Context) error {
-	typeSet := make(map[int]struct{})
+	typeSet := mapset.NewThreadUnsafeSet[int]()
 	for _, table := range p.schema.tables {
 		for _, col := range table.columns {
-			typeSet[col.TypeOID] = struct{}{}
+			typeSet.Add(col.TypeOID)
 		}
 	}
 
-	loadTypes := make([]int, 0, len(typeSet))
-	for typ := range typeSet {
-		loadTypes = append(loadTypes, typ)
-	}
+	for typeSet.Cardinality() != 0 {
+		types := typeSet.ToSlice()
+		slices.Sort(types)
 
-	for len(loadTypes) != 1 {
-		p.schema.typesLoadOrder = append(p.schema.typesLoadOrder, loadTypes...)
-
-		var err error
-		loadTypes, err = p.loadTypesByOIDs(ctx, loadTypes)
+		dbtypes, err := p.q.Types(ctx, p.conn, types)
 		if err != nil {
-			return fmt.Errorf("error loading types: %w", err)
+			return err
 		}
+		p.log.Debug("loaded types", zap.Int("n", len(types)), zap.Ints("oids", types))
+
+		typeSet.Clear()
+		p.loadTypesByOIDs(dbtypes, typeSet)
 	}
 
 	return nil
 }
 
 func (p *Parser) loadTypesByOIDs(
-	ctx context.Context,
-	typeOIDs []int,
-) (moreTypes []int, err error) {
-	types, err := p.q.Types(ctx, p.conn, typeOIDs)
-	if err != nil {
-		return nil, err
-	}
-	p.log.Debug("types loaded",
-		zap.Ints("type_oids", typeOIDs),
-	)
-
+	types []query.Type,
+	typeSet mapset.Set[int],
+) {
 	for _, typ := range types {
 		p.schema.types[typ.TypeOID] = typ
 
@@ -225,37 +220,42 @@ func (p *Parser) loadTypesByOIDs(
 		if ok {
 			if typType == schema.DataTypeEnum {
 				p.schema.enumList = append(p.schema.enumList, typ.TypeOID)
+				continue
 			}
 		}
 
-		elemTypeOID := int(typ.ElemTypeOID.Int32)
-		if _, ok := p.schema.types[elemTypeOID]; !ok {
-			moreTypes = append(moreTypes, elemTypeOID)
-		}
-
-		rangeElemTypeOID := int(typ.RangeElementTypeOID.Int32)
-		if _, ok := p.schema.types[rangeElemTypeOID]; !ok {
-			moreTypes = append(moreTypes, rangeElemTypeOID)
-		}
-
-		domainTypeOID := int(typ.DomainTypeOID.Int32)
-		if _, ok := p.schema.types[domainTypeOID]; !ok {
-			moreTypes = append(moreTypes, domainTypeOID)
+		switch {
+		case typ.ElemTypeOID.Valid:
+			elemTypeOID := int(typ.ElemTypeOID.Int32)
+			if _, ok := p.schema.types[elemTypeOID]; !ok {
+				typeSet.Add(elemTypeOID)
+			}
+		case typ.RangeElementTypeOID.Valid:
+			rangeElemTypeOID := int(typ.RangeElementTypeOID.Int32)
+			if _, ok := p.schema.types[rangeElemTypeOID]; !ok {
+				typeSet.Add(rangeElemTypeOID)
+			}
+		case typ.DomainTypeOID.Valid:
+			domainTypeOID := int(typ.DomainTypeOID.Int32)
+			if _, ok := p.schema.types[domainTypeOID]; !ok {
+				typeSet.Add(domainTypeOID)
+			}
 		}
 	}
-
-	return moreTypes, nil
 }
 
 func (p *Parser) loadEnums(ctx context.Context) error {
 	enums, err := p.q.Enums(ctx, p.conn, p.schema.enumList)
 	if err != nil {
-		return fmt.Errorf("error loading enums: %w", err)
+		return xerrors.Errorf("error loading enums: %w", err)
 	}
 
 	for _, e := range enums {
 		p.schema.enums[e.TypeOID] = e
 	}
 
+	enumIDs := maps.Keys(p.schema.indexes)
+	slices.Sort(enumIDs)
+	p.log.Debug("loaded enums", zap.Int("n", len(enums)), zap.Ints("oids", enumIDs))
 	return nil
 }

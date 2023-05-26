@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
+	"golang.org/x/xerrors"
 	"gopkg.in/yaml.v3"
 
 	"github.com/Feresey/mtest/db"
@@ -24,7 +24,7 @@ type AppConfig struct {
 func (fc FileConfig) Build() (*AppConfig, error) {
 	patterns, err := fc.parsePatterns(fc.Patterns)
 	if err != nil {
-		return nil, fmt.Errorf("parse patterns failed: %w", err)
+		return nil, xerrors.Errorf("parse patterns failed: %w", err)
 	}
 	return &AppConfig{
 		DB: db.Config{
@@ -40,16 +40,16 @@ func ReadConfig(confPath string) (*AppConfig, error) {
 	var fc FileConfig
 	file, err := os.ReadFile(confPath)
 	if err != nil {
-		return nil, fmt.Errorf("read config file: %w", err)
+		return nil, xerrors.Errorf("read config file: %w", err)
 	}
 
 	if err := yaml.Unmarshal(file, &fc); err != nil {
-		return nil, fmt.Errorf("parse config: %w", err)
+		return nil, xerrors.Errorf("parse config: %w", err)
 	}
 
 	c, err := fc.Build()
 	if err != nil {
-		return nil, fmt.Errorf("process config data: %w", err)
+		return nil, xerrors.Errorf("process config data: %w", err)
 	}
 	return c, nil
 }
@@ -70,7 +70,7 @@ func (fc FileConfig) parsePatterns(
 			p.Schema = parts[0]
 			p.Tables = parts[1]
 		default:
-			return nil, fmt.Errorf("wrong pattern: %q", pattern)
+			return nil, xerrors.Errorf("wrong pattern: %q", pattern)
 		}
 		res = append(res, p)
 	}

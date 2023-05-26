@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
+	"golang.org/x/xerrors"
 
 	"github.com/Feresey/mtest/db"
 	"github.com/Feresey/mtest/parse"
@@ -30,15 +30,15 @@ func NewSchemaLoaderFlags() SchemaLoaderFlags {
 			Action: func(ctx *cli.Context, fpath string) error {
 				fileInfo, err := os.Stat(fpath)
 				if os.IsNotExist(err) {
-					return fmt.Errorf("dump file %q does not exist", fpath)
+					return xerrors.Errorf("dump file %q does not exist", fpath)
 				}
 				if fileInfo.IsDir() {
-					return fmt.Errorf("%q is a directory, expected file", fpath)
+					return xerrors.Errorf("%q is a directory, expected file", fpath)
 				}
 				if fileInfo.Mode().IsRegular() && fileInfo.Mode().Perm()&(1<<2) != 0 {
 					return nil
 				}
-				return fmt.Errorf("file %s exists but is not readable", fpath)
+				return xerrors.Errorf("file %s exists but is not readable", fpath)
 			},
 		},
 	}
@@ -82,7 +82,7 @@ func (p *SchemaLoader) Cleanup(ctx *cli.Context) error {
 		return nil
 	}
 	if err := p.conn.Close(ctx.Context); err != nil {
-		return fmt.Errorf("close pgx conn: %w", err)
+		return xerrors.Errorf("close pgx conn: %w", err)
 	}
 	return nil
 }
@@ -107,12 +107,12 @@ func (p *SchemaLoader) getSchemaFromFile(filename string) (s *schema.Schema, err
 	} else {
 		fileData, err := os.ReadFile(filename)
 		if err != nil {
-			return nil, fmt.Errorf("read schema dump file: %w", err)
+			return nil, xerrors.Errorf("read schema dump file: %w", err)
 		}
 		in = bytes.NewReader(fileData)
 	}
 	if err := json.NewDecoder(in).Decode(&s); err != nil {
-		return nil, fmt.Errorf("decode schema: %w", err)
+		return nil, xerrors.Errorf("decode schema: %w", err)
 	}
 	return s, nil
 }
@@ -131,7 +131,7 @@ func (p *SchemaLoader) parseDB(ctx *cli.Context) (s *schema.Schema, err error) {
 		if errors.As(err, &pErr) {
 			p.log.Error(pErr.Pretty())
 		}
-		return nil, fmt.Errorf("parse schema: %w", err)
+		return nil, xerrors.Errorf("parse schema: %w", err)
 	}
 
 	return s, nil

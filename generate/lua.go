@@ -1,12 +1,12 @@
 package generate
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/Feresey/mtest/schema"
 	lua "github.com/yuin/gopher-lua"
 	"go.uber.org/zap"
+	"golang.org/x/xerrors"
 )
 
 const (
@@ -41,7 +41,7 @@ func NewLuaDomain(
 
 	compiled, err := l.Load(source, name)
 	if err != nil {
-		return nil, fmt.Errorf("lua source failed to compile: %w", err)
+		return nil, xerrors.Errorf("lua source failed to compile: %w", err)
 	}
 
 	// загрузка скомпилированной функции в машину
@@ -49,7 +49,7 @@ func NewLuaDomain(
 	// protected call. Не знаю почему, но так надо
 	err = l.PCall(0, 0, nil)
 	if err != nil {
-		return nil, fmt.Errorf("load source code filter %w", err)
+		return nil, xerrors.Errorf("load source code filter %w", err)
 	}
 
 	for _, v := range []struct {
@@ -74,7 +74,7 @@ func NewLuaDomain(
 func (l *LuaDomain) loadFunc(name string) (lua.LValue, error) {
 	fn := l.l.GetGlobal(name)
 	if fn.Type() != lua.LTFunction {
-		return nil, fmt.Errorf(
+		return nil, xerrors.Errorf(
 			"lua filter must be a Lua function, but %s is %s",
 			name, fn.Type().String())
 	}

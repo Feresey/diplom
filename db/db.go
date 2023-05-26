@@ -2,12 +2,12 @@ package db
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/tracelog"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/xerrors"
 )
 
 type Config struct {
@@ -24,7 +24,7 @@ func NewDB(
 ) (*pgx.Conn, error) {
 	cnf, err := pgx.ParseConfig(cfg.Conn)
 	if err != nil {
-		return nil, fmt.Errorf("parse config: %w", err)
+		return nil, xerrors.Errorf("parse config: %w", err)
 	}
 
 	if cfg.debug {
@@ -36,7 +36,7 @@ func NewDB(
 
 	c, err := pgx.ConnectConfig(ctx, cnf)
 	if err != nil {
-		return nil, fmt.Errorf("connect to database: %w", err)
+		return nil, xerrors.Errorf("connect to database: %w", err)
 	}
 	return c, nil
 }

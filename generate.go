@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/csv"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,6 +12,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
+	"golang.org/x/xerrors"
 
 	"github.com/Feresey/mtest/generate"
 	"github.com/Feresey/mtest/schema"
@@ -49,12 +49,12 @@ func NewGenerateCommand(f flags) *GenerateCommand {
 					// Проверяем, существует ли директория
 					info, err := os.Stat(dirname)
 					if err != nil {
-						return fmt.Errorf("output path does not exist: %q", dirname)
+						return xerrors.Errorf("output path does not exist: %q", dirname)
 					}
 
 					// Проверяем, является ли это директорией
 					if !info.IsDir() {
-						return fmt.Errorf("output path is not a directory: %q", dirname)
+						return xerrors.Errorf("output path is not a directory: %q", dirname)
 					}
 					return nil
 				},
@@ -116,13 +116,13 @@ func (p *GenerateCommand) GenerateRecords(ctx *cli.Context) error {
 	// for tableOID, records := range records {
 	// 	table, ok := s.Tables[tableOID]
 	// 	if !ok {
-	// 		err := fmt.Errorf("internal error: table with oid %d not found for generated records", tableOID)
+	// 		err := xerrors.Errorf("internal error: table with oid %d not found for generated records", tableOID)
 	// 		p.log.Error(err.Error())
 	// 		return err
 	// 	}
 	// 	err := p.DumpRecords(&table, records, p.flags.outputPath.Get(ctx))
 	// 	if err != nil {
-	// 		err = fmt.Errorf("dump generated records: %w", err)
+	// 		err = xerrors.Errorf("dump generated records: %w", err)
 	// 		p.log.Error(err.Error())
 	// 		return err
 	// 	}
@@ -188,14 +188,14 @@ func (p *GenerateCommand) DefaultsCommand() *cli.Command {
 
 			gen, err := generate.New(p.log, s)
 			if err != nil {
-				return fmt.Errorf("create generator: %w", err)
+				return xerrors.Errorf("create generator: %w", err)
 			}
 
 			for _, table := range tables {
 				records := gen.GetDefaultChecks(table)
 				err := p.DumpRecords(table, records, p.flags.outputPath.Get(ctx))
 				if err != nil {
-					err = fmt.Errorf("dump default checks: %w", err)
+					err = xerrors.Errorf("dump default checks: %w", err)
 					p.log.Error(err.Error())
 					return err
 				}
@@ -220,7 +220,7 @@ func (p *GenerateCommand) DumpRecords(
 			return csv.NewWriter(w).WriteAll(conv.ConvertRecords(table, records))
 		})
 	if err != nil {
-		err = fmt.Errorf("dump partial records for table %q: %w", table, err)
+		err = xerrors.Errorf("dump partial records for table %q: %w", table, err)
 		p.log.Error(err.Error())
 		return err
 	}
@@ -254,7 +254,7 @@ func dumpToFile[T any](
 	} else {
 		file, err := os.Create(dumpfile)
 		if err != nil {
-			err := fmt.Errorf("create output file for default checks: %w", err)
+			err := xerrors.Errorf("create output file for default checks: %w", err)
 			log.Error(err.Error())
 			return cli.Exit("", 5)
 		}

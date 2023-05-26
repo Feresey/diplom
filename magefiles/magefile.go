@@ -3,12 +3,11 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"regexp"
 
+	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
 
@@ -16,18 +15,36 @@ func Lint() error {
 	return sh.RunV("golangci-lint", "run")
 }
 
-func Update() error {
-	return sh.RunV("go", "get", "-u", "-v")
+func Generate() error {
+	return sh.RunV("go", "generate", "./...")
 }
 
-func InstallTools() error {
-	wd, err := os.Getwd()
-	if err != nil {
+func Update() error {
+	if err := sh.RunV("go", "get", "-u", "-v"); err != nil {
 		return err
 	}
-	if filepath.Base(wd) != "tools" {
-		return fmt.Errorf("mage -w tools installTools")
-	}
+	return sh.RunV("go", "mod", "tidy", "-v")
+}
+
+type Test mg.Namespace
+
+func (Test) All() error {
+	return sh.RunV("go", "test", "-v", "./...")
+}
+
+type Tools mg.Namespace
+
+func (Tools) chdir() error {
+	return os.Chdir("tools")
+}
+
+func (t Tools) Update() {
+	mg.Deps(t.chdir)
+	mg.Deps(Update)
+}
+
+func (t Tools) Install() error {
+	mg.Deps(t.chdir)
 	file, err := os.ReadFile("tools.go")
 	if err != nil {
 		return err

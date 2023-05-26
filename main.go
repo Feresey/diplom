@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/xerrors"
 
 	"github.com/Feresey/mtest/db"
 	"github.com/jackc/pgx/v5"
@@ -61,13 +62,21 @@ func main() {
 			NewParseCommand(f).Command(),
 			NewGenerateCommand(f).Command(),
 		},
+		ExitErrHandler: func(ctx *cli.Context, err error) {
+			if err == nil {
+				return
+			}
+			if f.debug.Get(ctx) {
+				fmt.Printf("%+v\n", err)
+			} else {
+				fmt.Printf("%v\n", err)
+			}
+			os.Exit(1)
+		},
 		EnableBashCompletion: true,
 	}
 	err := app.Run(os.Args)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
+	println(err)
 }
 
 type BaseCommand struct {
@@ -79,12 +88,12 @@ func NewBase(ctx *cli.Context, f flags) (BaseCommand, error) {
 	var empty BaseCommand
 	log, err := newLogger(f.debug.Get(ctx))
 	if err != nil {
-		return empty, fmt.Errorf("create logger: %w", err)
+		return empty, xerrors.Errorf("create logger: %w", err)
 	}
 	zap.ReplaceGlobals(log)
 	cnf, err := ReadConfig(f.configPath.Get(ctx))
 	if err != nil {
-		return empty, fmt.Errorf("get config: %w", err)
+		return empty, xerrors.Errorf("get config: %w", err)
 	}
 	log.Debug("config readed")
 
@@ -100,7 +109,7 @@ func (b *BaseCommand) connectDB(ctx *cli.Context, debug bool) (*pgx.Conn, error)
 	}
 	conn, err := db.NewDB(ctx.Context, b.log, b.cnf.DB)
 	if err != nil {
-		return nil, fmt.Errorf("create database connection: %w", err)
+		return nil, xerrors.Errorf("create database connection: %w", err)
 	}
 	b.log.Debug("connected to database")
 

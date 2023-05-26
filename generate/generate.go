@@ -127,7 +127,7 @@ type PartialRecords struct {
 
 // 	typeName := col.Type.TypeName
 // 	if typeName.Schema != "pg_catalog" {
-// 		return nil, fmt.Errorf(
+// 		return nil, xerrors.Errorf(
 // 			"unable to determine default type domain for non-default postgres type %q. "+
 // 				"table %q, column %q",
 // 			typeName,
@@ -168,7 +168,7 @@ type PartialRecords struct {
 // 		t.Init(time.Now(), defaultTopDomainIterations)
 // 		return &t, nil
 // 	default:
-// 		return nil, fmt.Errorf(
+// 		return nil, xerrors.Errorf(
 // 			"unable to determine default domain for type %q. "+
 // 				"table %q, column %q",
 // 			typeName,
@@ -276,7 +276,7 @@ type PartialRecords struct {
 
 // 		domain, ok := g.domains.ColumnDomains[col.ColNum]
 // 		if !ok {
-// 			return nil, fmt.Errorf(
+// 			return nil, xerrors.Errorf(
 // 				"internal error: unable to find column domain for column %q for table %q",
 // 				col.Name, g.table.Name)
 // 		}
@@ -284,7 +284,7 @@ type PartialRecords struct {
 // 		// TODO перебирать можно только заполненные записи
 // 		if ok := g.generateAndCheckValue(col, domain, record); !ok {
 // 			// TODO по идее по исчерпании домена надо текущую запись пропускать и продолжить
-// 			return nil, fmt.Errorf(
+// 			return nil, xerrors.Errorf(
 // 				"unable to generate values within expiration of domain. column %q, table %q",
 // 				col.Name, g.table.Name)
 // 		}

@@ -3,13 +3,13 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/xerrors"
 
 	"github.com/Feresey/mtest/db"
 	"github.com/Feresey/mtest/parse"
@@ -78,7 +78,7 @@ func (p *ParseCommand) Cleanup(ctx *cli.Context) error {
 		return nil
 	}
 	if err := p.conn.Close(ctx.Context); err != nil {
-		return fmt.Errorf("close pgx conn: %w", err)
+		return xerrors.Errorf("close pgx conn: %w", err)
 	}
 	return nil
 }
@@ -91,13 +91,13 @@ func (p *ParseCommand) Run(ctx *cli.Context) error {
 		if errors.As(err, &pErr) {
 			println(pErr.Pretty())
 		}
-		return fmt.Errorf("parse schema: %w", err)
+		return xerrors.Errorf("parse schema: %w", err)
 	}
 	p.log.Info("schema parsed")
 
 	graph := s.NewGraph()
 	if _, err := graph.TopologicalSort(); err != nil {
-		return fmt.Errorf("try to determine tables order: %w", err)
+		return xerrors.Errorf("try to determine tables order: %w", err)
 	}
 
 	outputPath := p.pf.outputPath.Get(ctx)
@@ -109,19 +109,19 @@ func (p *ParseCommand) dump(s *schema.Schema, dumpPath string) error {
 	slog := p.log.Sugar()
 
 	if err := p.createDirIfNotExist(dumpPath); err != nil {
-		return fmt.Errorf("create dump dir: %w", err)
+		return xerrors.Errorf("create dump dir: %w", err)
 	}
 
 	schemaDumpPath := filepath.Join(dumpPath, "schema.sql")
 	slog.Infof("dump sql to %q", schemaDumpPath)
 	if err := p.dumpTemplate(schemaDumpPath, s, schema.DumpSchemaTemplate); err != nil {
-		return fmt.Errorf("failed to dump sql schema: %w", err)
+		return xerrors.Errorf("failed to dump sql schema: %w", err)
 	}
 
 	graphDumpPath := filepath.Join(dumpPath, "graph.puml")
 	slog.Infof("dump graph to %q", graphDumpPath)
 	if err := p.dumpTemplate(graphDumpPath, s, schema.DumpGrapthTemplate); err != nil {
-		return fmt.Errorf("failed to dump grapth: %w", err)
+		return xerrors.Errorf("failed to dump grapth: %w", err)
 	}
 
 	// for name ,elem := range graph.Graph {
@@ -135,7 +135,7 @@ func (p *ParseCommand) dump(s *schema.Schema, dumpPath string) error {
 		enc.SetIndent("", "  ")
 		return enc.Encode(s)
 	}); err != nil {
-		return fmt.Errorf("failed to dump json schema: %w", err)
+		return xerrors.Errorf("failed to dump json schema: %w", err)
 	}
 
 	return nil
@@ -168,7 +168,7 @@ func (p *ParseCommand) dumpTemplate(
 func (p *ParseCommand) dumpToFile(fileName string, f func(w io.Writer) error) (err error) {
 	file, err := os.Create(fileName)
 	if err != nil {
-		return fmt.Errorf("create output file for dump: %w", err)
+		return xerrors.Errorf("create output file for dump: %w", err)
 	}
 	defer func() {
 		err = errors.Join(err, file.Close())

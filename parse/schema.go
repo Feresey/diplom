@@ -1,10 +1,13 @@
 package parse
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Feresey/mtest/parse/query"
 	"github.com/Feresey/mtest/schema"
+	mapset "github.com/deckarep/golang-set/v2"
+	"golang.org/x/xerrors"
 )
 
 // Перевод значений колонки pg_constraint.type.
@@ -29,9 +32,8 @@ var pgTypType = map[string]schema.DataType{
 }
 
 type parseSchema struct {
-	typesLoadOrder []int
-	typesByOID     map[int]schema.DBType
-	types          map[int]query.Type
+	typesByOID map[int]schema.DBType
+	types      map[int]query.Type
 
 	enumList []int
 	enums    map[int]query.Enum
@@ -55,34 +57,48 @@ func (ps *parseSchema) convertToSchema() (*schema.Schema, error) {
 		Tables: make(map[string]schema.Table),
 	}
 
-	reverse(ps.typesLoadOrder)
-
 	if err := ps.convertTypes(s); err != nil {
-		return nil, err
+		return nil, xerrors.Errorf("convert types: %w", err)
 	}
 	if err := ps.convertTables(s); err != nil {
-		return nil, err
+		return nil, xerrors.Errorf("convert tables: %w", err)
 	}
 	if err := ps.convertConstraints(s); err != nil {
-		return nil, err
+		return nil, xerrors.Errorf("convert constraints: %w", err)
 	}
 	if err := ps.convertIndexes(s); err != nil {
-		return nil, err
+		return nil, xerrors.Errorf("convert indexes: %w", err)
 	}
 	return s, nil
 }
 
 func (ps *parseSchema) convertTypes(s *schema.Schema) error {
-	for _, typeOID := range ps.typesLoadOrder {
-		typ, ok := ps.types[typeOID]
-		if !ok {
-			return fmt.Errorf("internal error: type with oid %d not found", typeOID)
+	types := mapset.NewThreadUnsafeSetFromMapKeys(ps.types)
+
+	for types.Cardinality() != 0 {
+		var rerr error
+		types.Each(func(typeOID int) bool {
+			typ, ok := ps.types[typeOID]
+			if !ok {
+				rerr = xerrors.Errorf("internal error: type with oid %d not found", typeOID)
+				return false
+			}
+			t, err := ps.fillType(&typ)
+			if err != nil {
+				var terr typeNotFoundError
+				if errors.As(err, &terr) {
+					return true
+				}
+				rerr = xerrors.Errorf("fill type %q(%d): %w", typ.TypeName, typ.TypeOID, err)
+				return false
+			}
+			ps.typesByOID[typeOID] = t
+			types.Remove(typeOID)
+			return true
+		})
+		if rerr != nil {
+			return rerr
 		}
-		t, err := ps.fillType(&typ)
-		if err != nil {
-			return err
-		}
-		ps.typesByOID[typeOID] = t
 	}
 
 	for _, typ := range ps.typesByOID {
@@ -95,18 +111,23 @@ func (ps *parseSchema) convertTypes(s *schema.Schema) error {
 	return nil
 }
 
-func (ps *parseSchema) getType(oid int) (schema.DBType, error) {
-	elem, ok := ps.typesByOID[oid]
-	if !ok {
-		return nil, fmt.Errorf("type with oid %d not found", oid)
-	}
-	return elem, nil
+type typeNotFoundError struct {
+	OID int
+	xerrors.Frame
+}
+
+func (t typeNotFoundError) Error() string {
+	return fmt.Sprintf("type with oid %d not found", t.OID)
+}
+
+func getTypeError(oid int) error {
+	return typeNotFoundError{OID: oid}
 }
 
 func (ps *parseSchema) fillType(dbtype *query.Type) (schema.DBType, error) {
 	typType, ok := pgTypType[dbtype.TypeType]
 	if !ok {
-		return nil, fmt.Errorf("typtype value is undefined: %q", dbtype.TypeType)
+		return nil, xerrors.Errorf("typtype value is undefined: %q", dbtype.TypeType)
 	}
 	if dbtype.IsArray {
 		typType = schema.DataTypeArray
@@ -123,12 +144,13 @@ func (ps *parseSchema) fillType(dbtype *query.Type) (schema.DBType, error) {
 
 	switch typType {
 	default:
-		return nil, fmt.Errorf("data type is undefined: %s", typType)
+		return nil, xerrors.Errorf("data type is undefined: %s", typType)
 	case schema.DataTypeBase:
 	case schema.DataTypeArray:
-		elem, err := ps.getType(int(dbtype.ElemTypeOID.Int32))
-		if err != nil {
-			return nil, err
+		oid := int(dbtype.ElemTypeOID.Int32)
+		elem, ok := ps.typesByOID[oid]
+		if !ok {
+			return nil, xerrors.Errorf("get array elem type: %w", getTypeError(oid))
 		}
 		return &schema.ElemType{
 			BaseType: baseType,
@@ -137,16 +159,16 @@ func (ps *parseSchema) fillType(dbtype *query.Type) (schema.DBType, error) {
 	case schema.DataTypeEnum:
 		values, ok := ps.enums[baseType.GetOID()]
 		if !ok {
-			return nil, fmt.Errorf("values for enum %q not found", baseType.String())
+			return nil, xerrors.Errorf("values for enum %q not found", baseType.String())
 		}
 		return &schema.EnumType{
 			BaseType: baseType,
 			Values:   values.Values,
 		}, nil
 	case schema.DataTypeRange:
-		elem, err := ps.getType(int(dbtype.RangeElementTypeOID.Int32))
-		if err != nil {
-			return nil, err
+		elem, ok := ps.typesByOID[int(dbtype.RangeElementTypeOID.Int32)]
+		if !ok {
+			return nil, xerrors.Errorf("get range elem type: %w", getTypeError(int(dbtype.RangeElementTypeOID.Int32)))
 		}
 		return &schema.ElemType{
 			BaseType: baseType,
@@ -157,9 +179,9 @@ func (ps *parseSchema) fillType(dbtype *query.Type) (schema.DBType, error) {
 	case schema.DataTypeComposite:
 	// TODO add composite type
 	case schema.DataTypeDomain:
-		elem, err := ps.getType(int(dbtype.ElemTypeOID.Int32))
-		if err != nil {
-			return nil, err
+		elem, ok := ps.typesByOID[int(dbtype.DomainTypeOID.Int32)]
+		if !ok {
+			return nil, xerrors.Errorf("get domain elem type: %w", getTypeError(int(dbtype.DomainTypeOID.Int32)))
 		}
 		return &schema.DomainType{
 			Attributes: schema.DomainAttributes{
@@ -195,9 +217,9 @@ func (ps *parseSchema) convertTables(s *schema.Schema) error {
 		}
 
 		for _, col := range table.columns {
-			typ, err := ps.getType(col.TypeOID)
-			if err != nil {
-				return err
+			typ, ok := ps.typesByOID[col.TypeOID]
+			if !ok {
+				return xerrors.Errorf("get column type for table %q: %w", t, getTypeError(col.TypeOID))
 			}
 
 			t.Columns[col.ColumnName] = schema.Column{
@@ -230,12 +252,12 @@ func (ps *parseSchema) convertTables(s *schema.Schema) error {
 func (ps *parseSchema) getTable(s *schema.Schema, oid int) (dbtable parseTable, table schema.Table, err error) {
 	dbtable, ok := ps.tables[oid]
 	if !ok {
-		return dbtable, table, fmt.Errorf("table with oid %d not found", oid)
+		return dbtable, table, xerrors.Errorf("table with oid %d not found", oid)
 	}
 	tableName := schema.Identifier{Schema: dbtable.table.Schema, Name: dbtable.table.Table}
 	table, ok = s.Tables[tableName.String()]
 	if !ok {
-		return dbtable, table, fmt.Errorf("table %q not found", tableName)
+		return dbtable, table, xerrors.Errorf("table %q not found", tableName)
 	}
 	return dbtable, table, nil
 }
@@ -244,17 +266,18 @@ func (ps *parseSchema) convertConstraints(s *schema.Schema) error {
 	for _, dbconstraint := range ps.constraints {
 		dbtable, table, err := ps.getTable(s, dbconstraint.TableOID)
 		if err != nil {
-			return err
+			return xerrors.Errorf("get table for constraint %q: %w", dbconstraint.ConstraintName, err)
 		}
 
 		typ, ok := pgConstraintType[dbconstraint.ConstraintType]
 		if !ok {
-			return fmt.Errorf("unsupported constraint type: %q", dbconstraint.ConstraintType)
+			return xerrors.Errorf("unsupported constraint type: %q", dbconstraint.ConstraintType)
 		}
 
 		cols, err := ps.checkTableColumns(dbconstraint.Colnums, &dbtable)
 		if err != nil {
-			return err
+			return xerrors.Errorf("check table %q columns for constraint %q: %w",
+				table, dbconstraint.ConstraintName, err)
 		}
 
 		c := schema.Constraint{
@@ -273,16 +296,16 @@ func (ps *parseSchema) convertConstraints(s *schema.Schema) error {
 		case schema.ConstraintTypePK:
 			// PRIMARY KEY либо один либо нет его
 			table.PrimaryKey = &c
-			return nil
 		case schema.ConstraintTypeFK:
 			dbreftable, reftable, err := ps.getTable(s, dbconstraint.TableOID)
 			if err != nil {
-				return err
+				return xerrors.Errorf("get ref table for table %q fk constraint %q: %w", table, c, err)
 			}
 
 			refcols, err := ps.checkTableColumns(dbconstraint.ForeignColnums, &dbreftable)
 			if err != nil {
-				return err
+				return xerrors.Errorf("check ref table %q columns for fk constraint %q of table %q: %w",
+					reftable, dbconstraint.ConstraintName, table, err)
 			}
 			table.ForeignKeys[reftable.String()] = schema.ForeignKey{
 				Constraint:       c,
@@ -299,11 +322,12 @@ func (ps *parseSchema) convertIndexes(s *schema.Schema) error {
 	for _, dbindex := range ps.indexes {
 		dbtable, table, err := ps.getTable(s, dbindex.TableOID)
 		if err != nil {
-			return err
+			return xerrors.Errorf("get table for index %q: %w", dbindex.IndexName, err)
 		}
 		cols, err := ps.checkTableColumns(dbindex.Columns, &dbtable)
 		if err != nil {
-			return err
+			return xerrors.Errorf("check table %q columns for index %q: %w",
+				table, dbindex.IndexName, err)
 		}
 
 		index := schema.Index{
@@ -322,8 +346,8 @@ func (ps *parseSchema) convertIndexes(s *schema.Schema) error {
 			conOID := int(dbindex.ConstraintOID.Int32)
 			c, ok := ps.constraintsByOID[conOID]
 			if !ok {
-				return fmt.Errorf("constraint with oid %d not found for index %q",
-					conOID, index.String())
+				return xerrors.Errorf("constraint with oid %d not found for index %q on table %q",
+					conOID, index.String(), table)
 			}
 
 			c.Index = &index
@@ -341,15 +365,9 @@ func (ps *parseSchema) checkTableColumns(
 	for _, colnum := range colnums {
 		tcol, ok := table.columns[colnum]
 		if !ok {
-			return nil, fmt.Errorf("column %d not found in table %d", colnum, table.table.OID)
+			return nil, xerrors.Errorf("column %d not found in table %d", colnum, table.table.OID)
 		}
 		cols = append(cols, tcol.ColumnName)
 	}
 	return cols, nil
-}
-
-func reverse[S ~[]E, E any](s S) {
-	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-		s[i], s[j] = s[j], s[i]
-	}
 }
