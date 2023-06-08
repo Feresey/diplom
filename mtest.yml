@@ -1,3 +1,32 @@
-dbconn: "postgresql://postgres:postgres@localhost:5432"
-parser:
-  - test
+db: "postgresql://postgres:postgres@localhost:5432"
+## or
+# db:
+#   host: localhost
+#   port: 5432
+#   user: postgres
+#   pass: postgres
+#   sslmode: disable
+
+parse:
+  patterns:
+    - test
+    # - schema
+    ## or
+    # - schema.table
+
+files:
+  # it's better to specify this
+  schema-dump: mtest/schema.json
+  # feature
+  schema-sql: mtest/schema.sql
+  # feature
+  graph: mtest/graph.puml
+
+generate:
+  data:
+    # insert on the fly
+    insert: true
+    dump:
+      dir: mtest/generated
+      format: csv # json, sql-insert, sql-copy-to
+  root: mtest/scripts/main.lua

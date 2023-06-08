@@ -1,7 +1,5 @@
 package schema
 
-import lua "github.com/yuin/gopher-lua"
-
 // Identifier описывает имя элемента.
 type Identifier struct {
 	// Row identifier
@@ -12,7 +10,12 @@ type Identifier struct {
 	Name string `json:"name"`
 }
 
-func (i Identifier) String() string { return i.Schema + "." + i.Name }
+func (i Identifier) String() string {
+	if i.Schema == "pg_catalog" {
+		return i.Name
+	}
+	return i.Schema + "." + i.Name
+}
 
 // Schema отражает схему, расположенную в базе данных.
 type Schema struct {
@@ -97,9 +100,6 @@ type DBType struct {
 func (t *DBType) String() string    { return t.TypeName.String() }
 func (t *DBType) GetOID() int       { return t.TypeName.OID }
 func (t *DBType) TypType() DataType { return t.Type }
-func (t *DBType) ToLua(*lua.LState) *lua.LTable {
-	return nil
-}
 
 type DomainAttributes struct {
 	// Допустимы ли NULL значения колонки

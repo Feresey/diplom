@@ -29,7 +29,15 @@ func Update() error {
 type Test mg.Namespace
 
 func (Test) All() error {
+	return sh.RunV("go", "test", "./...")
+}
+
+func (Test) Verbose() error {
 	return sh.RunV("go", "test", "-v", "./...")
+}
+
+func (Test) Failfast() error {
+	return sh.RunV("go", "test", "-failfast", "./...")
 }
 
 type Tools mg.Namespace

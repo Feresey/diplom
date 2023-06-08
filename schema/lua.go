@@ -16,31 +16,26 @@ func (s *Schema) ToLua(l *lua.LState) *lua.LTable {
 	return schema
 }
 
-// func (t *Type) ToLua(l *lua.LState) *lua.LTable {
-// 	lt := l.NewTable()
+func (t *DBType) ToLua(l *lua.LState) *lua.LTable {
+	typ := l.NewTable()
 
-// 	lt.RawSetString("type", lua.LString(t.Type.String()))
-// 	switch tt := t.ConcreteType.(type) {
-// 	case *ElemType:
-// 		lt.RawSetString("elem_type", lua.LString(tt.ElemType.String()))
-// 	case *DomainType:
-// 		dat := l.NewTable()
-// 		tt.Attributes.ToLuaTable(l, dat)
-// 		lt.RawSetString("domain_attributes", dat)
-// 		lt.RawSetString("elem_type", lua.LString(tt.ElemType.String()))
-// 	case *EnumType:
-// 		ev := l.NewTable()
-// 		for _, value := range tt.Values {
-// 			ev.Append(lua.LString(value))
-// 		}
-// 		lt.RawSetString("enum", ev)
-// 	}
+	typ.RawSetString("name", lua.LString(t.String()))
+	typ.RawSetString("type", lua.LString(t.Type.String()))
+	if t.ElemType != nil {
+		typ.RawSetString("elem_type", t.ElemType.ToLua(l))
+	}
+	typ.RawSetString("enum_values", luaList(l, t.EnumValues))
+	if t.DomainAttributes != nil {
+		typ.RawSetString("attrs", t.DomainAttributes.ToLua(l))
+	}
 
-// 	return lt
-// }
+	return typ
+}
 
 func (t *Table) ToLua(l *lua.LState) *lua.LTable {
 	table := l.NewTable()
+	table.RawSetString("name", lua.LString(t.Name.String()))
+
 	if t.PrimaryKey != nil {
 		table.RawSetString("pk", lua.LString(t.PrimaryKey.String()))
 	}
@@ -76,7 +71,7 @@ func (c *Constraint) ToLua(l *lua.LState) *lua.LTable {
 	lc := l.NewTable()
 	lc.RawSetString("type", lua.LString(c.Type.String()))
 	lc.RawSetString("definition", lua.LString(c.Definition))
-	lc.RawSetString("columns", luaColNames(l, c.Columns))
+	lc.RawSetString("columns", luaList(l, c.Columns))
 	if c.Index != nil {
 		lc.RawSetString("index", lua.LString(c.Index.String()))
 	}
@@ -89,14 +84,14 @@ func (i *Index) ToLua(l *lua.LState) *lua.LTable {
 	li.RawSetString("is_unique", lua.LBool(i.IsUnique))
 	li.RawSetString("is_primary", lua.LBool(i.IsPrimary))
 	li.RawSetString("is_nulls_not_distinct", lua.LBool(i.IsNullsNotDistinct))
-	li.RawSetString("columns", luaColNames(l, i.Columns))
+	li.RawSetString("columns", luaList(l, i.Columns))
 	return li
 }
 
-func luaColNames(l *lua.LState, cols []string) *lua.LTable {
+func luaList(l *lua.LState, arr []string) *lua.LTable {
 	lc := l.NewTable()
-	for _, col := range cols {
-		lc.Append(lua.LString(col))
+	for _, value := range arr {
+		lc.Append(lua.LString(value))
 	}
 	return lc
 }
@@ -104,13 +99,14 @@ func luaColNames(l *lua.LState, cols []string) *lua.LTable {
 func (fk *ForeignKey) ToLua(l *lua.LState, table *Table) *lua.LTable {
 	lf := l.NewTable()
 	lf.RawSetString("reference", lua.LString(fk.ReferenceTable))
-	lf.RawSetString("local_cols", luaColNames(l, fk.Constraint.Columns))
-	lf.RawSetString("reference_cols", luaColNames(l, fk.ReferenceColumns))
+	lf.RawSetString("local_cols", luaList(l, fk.Constraint.Columns))
+	lf.RawSetString("reference_cols", luaList(l, fk.ReferenceColumns))
 	return lf
 }
 
 func (c *Column) ToLua(l *lua.LState) *lua.LTable {
 	lc := l.NewTable()
+	lc.RawSetString("name", lua.LString(c.Name))
 	lc.RawSetString("type", c.Type.ToLua(l))
 	lc.RawSetString("attr", c.Attributes.ToLua(l))
 	return lc
@@ -125,14 +121,26 @@ func (a *ColumnAttributes) ToLua(l *lua.LState) *lua.LTable {
 			la.RawSetString("default", lua.LString(a.Default))
 		}
 	}
-	a.DomainAttributes.ToLuaTable(l, la)
+	a.DomainAttributes.ToLuaTable(la)
 	return la
 }
 
-func (a *DomainAttributes) ToLuaTable(l *lua.LState, dt *lua.LTable) {
+func (a *DomainAttributes) ToLua(l *lua.LState) *lua.LTable {
+	dtable := l.NewTable()
+	a.ToLuaTable(dtable)
+	return dtable
+}
+
+func (a *DomainAttributes) ToLuaTable(dt *lua.LTable) {
 	dt.RawSetString("notnull", lua.LBool(a.NotNullable))
-	dt.RawSetString("scale", lua.LNumber(a.NumericScale))
-	dt.RawSetString("precision", lua.LNumber(a.NumericPrecision))
-	dt.RawSetString("char_max_length", lua.LNumber(a.CharMaxLength))
-	dt.RawSetString("array_dims", lua.LNumber(a.ArrayDims))
+	if a.IsNumeric {
+		dt.RawSetString("scale", lua.LNumber(a.NumericScale))
+		dt.RawSetString("precision", lua.LNumber(a.NumericPrecision))
+	}
+	if a.HasCharMaxLength {
+		dt.RawSetString("char_max_length", lua.LNumber(a.CharMaxLength))
+	}
+	if a.ArrayDims != 0 {
+		dt.RawSetString("array_dims", lua.LNumber(a.ArrayDims))
+	}
 }

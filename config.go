@@ -12,8 +12,24 @@ import (
 )
 
 type FileConfig struct {
-	DBConn   string   `yaml:"dbconn"`
-	Patterns []string `yaml:"parser"`
+	DBConn string `yaml:"db"`
+	Parse  struct {
+		Patterns []string `yaml:"patterns"`
+	} `yaml:"parse"`
+	Files struct {
+		SchemaDump string `yaml:"schema-dump"`
+		SchemaSQL  string `yaml:"schema-sql"`
+		Graph      string `yaml:"grahp"`
+	} `yaml:"files"`
+	Generate struct {
+		Data struct {
+			Insert bool `yaml:"insert"`
+			Dump   struct {
+				Dir    string `yaml:"dir"`
+				Format string `yaml:"format"`
+			} `yaml:"dump"`
+		} `yaml:"data"`
+	} `yaml:"generate"`
 }
 
 type AppConfig struct {
@@ -22,7 +38,7 @@ type AppConfig struct {
 }
 
 func (fc FileConfig) Build() (*AppConfig, error) {
-	patterns, err := fc.parsePatterns(fc.Patterns)
+	patterns, err := fc.parsePatterns(fc.Parse.Patterns)
 	if err != nil {
 		return nil, xerrors.Errorf("parse patterns failed: %w", err)
 	}

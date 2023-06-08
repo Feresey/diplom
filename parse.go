@@ -16,19 +16,8 @@ import (
 	"github.com/Feresey/mtest/schema"
 )
 
-type ParseFlags struct {
-	flags
-	outputPath *cli.StringFlag
-}
-
-func (pf *ParseFlags) Set() []cli.Flag {
-	return append(pf.flags.Set(),
-		pf.outputPath,
-	)
-}
-
 type ParseCommand struct {
-	pf ParseFlags
+	flags flags
 	BaseCommand
 
 	conn *pgx.Conn
@@ -36,15 +25,10 @@ type ParseCommand struct {
 
 func NewParseCommand(f flags) *ParseCommand {
 	return &ParseCommand{
-		pf: ParseFlags{
-			flags: f,
-			outputPath: &cli.StringFlag{
-				Name:        "output",
-				DefaultText: "dump",
-				Required:    true,
-				Aliases:     []string{"o"},
-			},
-		},
+		flags: f,
+		// set up by init
+		conn:        nil,
+		BaseCommand: BaseCommand{},
 	}
 }
 
@@ -52,7 +36,7 @@ func (p *ParseCommand) Command() *cli.Command {
 	return &cli.Command{
 		Name:        "parse",
 		Description: "parse schema",
-		Flags:       p.pf.Set(),
+		Flags:       p.flags.Set(),
 		Before:      p.Init,
 		Action:      p.Run,
 		After:       p.Cleanup,
@@ -60,11 +44,11 @@ func (p *ParseCommand) Command() *cli.Command {
 }
 
 func (p *ParseCommand) Init(ctx *cli.Context) error {
-	base, err := NewBase(ctx, p.pf.flags)
+	base, err := NewBase(ctx, p.flags)
 	if err != nil {
 		return cli.Exit(err, 2)
 	}
-	conn, err := base.connectDB(ctx, p.pf.debug.Get(ctx))
+	conn, err := base.connectDB(ctx, p.flags.debug.Get(ctx))
 	if err != nil {
 		return cli.Exit(err, 3)
 	}
@@ -99,8 +83,6 @@ func (p *ParseCommand) Run(ctx *cli.Context) error {
 	if _, err := graph.TopologicalSort(); err != nil {
 		return xerrors.Errorf("try to determine tables order: %w", err)
 	}
-
-	outputPath := p.pf.outputPath.Get(ctx)
 
 	return p.dump(s, outputPath)
 }

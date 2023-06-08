@@ -10,5 +10,8 @@
             "password": "postgres",
             "database": "delme-2"
         }
+    ],
+    "cSpell.words": [
+        "mtest"
     ]
 }
